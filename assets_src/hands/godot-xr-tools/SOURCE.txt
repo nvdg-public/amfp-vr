@@ -1,0 +1,1 @@
+Source: https://github.com/GodotVR/godot-xr-tools commit 6fc5361db295c12b5e51ee5b9fee09751a4458e7, addons/godot-xr-tools/hands (CC0 1.0, see License.md). Downloaded 2026-10-08. Subset only.
