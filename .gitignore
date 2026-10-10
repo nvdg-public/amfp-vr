@@ -20,5 +20,4 @@
 !/phase2/*.cfg
 !/run/vr_assets/
 dist/
-/private/
 /src/tools/vrlauncher/obj/
