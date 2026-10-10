@@ -45,6 +45,12 @@ if /i "%TARGET%"=="engine" goto done
 echo === Building aamfp.exe
 msbuild "%ROOT%Game\src\game\Lux.vcxproj" %MSB% "/p:SolutionDir=%ROOT%Game\src\game\\" || exit /b 1
 
+echo === Building the VR package launcher (aamfp_vr.exe)
+if not exist "%ROOT%tools\vrlauncher\obj" mkdir "%ROOT%tools\vrlauncher\obj"
+cl /nologo /EHsc /MT /O2 /W3 /DWIN32 /DUNICODE /D_UNICODE /D_CRT_SECURE_NO_WARNINGS ^
+  /Fo"%ROOT%tools\vrlauncher\obj\\" /Fe"%ROOT%Game\redist\aamfp_vr.exe" "%ROOT%tools\vrlauncher\VRLauncher.cpp" ^
+  /link /SUBSYSTEM:WINDOWS user32.lib ole32.lib shell32.lib || exit /b 1
+
 :done
 echo === Build OK
 endlocal

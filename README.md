@@ -37,18 +37,21 @@ Not needed: the newer Visual C++ 2015-2026 runtime (the package contains `msvcp1
 
 ## Installation
 
-You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 16 MB). It contains no game files.
+You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 11 MB). It contains no game files.
 
 1. Install everything under [Requirements](#requirements).
-2. Copy the `AmnesiaAMFP_VR` folder **into the game's folder** and rename it to `VR`, for example:
-   - Epic: `C:\Program Files\Epic Games\AmnesiaAMFP\VR`
-   - Steam: `C:\Program Files (x86)\Steam\steamapps\common\Amnesia A Machine for Pigs\VR`
+2. Unzip the package anywhere and double-click **`install.bat`** in it. It:
+   - finds your Epic or Steam copy of the game (if it can't, it asks for the folder with `aamfp.exe`);
+   - copies the VR files into a `VR` folder inside the game's folder (Windows may ask for administrator rights when the game is under *Program Files*);
+   - copies the game's engine DLLs and converts 98 character animations from your game files (a few seconds);
+   - puts an **Amnesia AMFP VR** shortcut on your desktop.
 
-   Another place works too: then the game asks once where the game is installed (the folder with `aamfp.exe` and `resources.cfg`).
-3. Optional: right-click `aamfp_vr.exe` > *Send to* > *Desktop (create shortcut)*.
-4. Start **SteamVR** and check that the headset and controllers are green.
-5. Start **`aamfp_vr.exe`**. The first start converts 98 character animations from your game files (a few seconds). Windows SmartScreen may warn because the exe isn't signed: *More info* > *Run anyway*.
-6. Put the headset on. **Recenter** with a right stick click (or F9) whenever you sit down or stand up.
+   Running it again (for example after an update) keeps your `vr_settings.cfg`. You can delete the unzipped folder afterwards.
+3. Start **SteamVR** and check that the headset and controllers are green.
+4. Start **Amnesia AMFP VR** from the desktop shortcut. Windows SmartScreen may warn because the exe isn't signed: *More info* > *Run anyway*.
+5. Put the headset on. **Recenter** with a right stick click (or F9) whenever you sit down or stand up.
+
+**Without the installer**: copy the package folder anywhere (inside the game's folder is easiest) and start `aamfp_vr.exe` in it. It asks once where the game is installed if it isn't the parent folder, and does the DLL and animation steps itself on the first start. Always start `aamfp_vr.exe`, not `aamfp_vr_game.exe`.
 
 **Buttons (Index controllers)**: left stick walk (click = run), right stick snap turn (click = recenter), right trigger use/click, right grip grab (let go mid-swing to throw), left grip at your left hip = lantern, left A journal, left B pause menu, right A crouch, right B jump.
 
@@ -74,7 +77,7 @@ Only needed to build the exe and the package yourself. On top of the requirement
    powershell -ExecutionPolicy Bypass -File src\tools\package\make_package.ps1
    powershell -ExecutionPolicy Bypass -File src\tools\package\deploy_to_epic.ps1
    ```
-   `make_package.ps1` builds `dist\AmnesiaAMFP_VR`. `deploy_to_epic.ps1` copies it into `<game>\VR`, converts the animations and makes a desktop shortcut "Amnesia AMFP VR"; it keeps an existing `vr_settings.cfg`. For a Steam copy use `deploy_to_steam.ps1`, which finds the game in your Steam libraries. Both accept `-Game "<folder>"`.
+   `make_package.ps1` builds `dist\AmnesiaAMFP_VR`. `deploy_to_epic.ps1` runs that package's `install.ps1` for the given game folder (the same installer players use). For a Steam copy use `deploy_to_steam.ps1`, which finds the game in your Steam libraries. Both accept `-Game "<folder>"`.
 
 For development, `run\` holds the working copy of the exe and its files, and `run\play_vr.bat` starts it against the Epic game folder.
 
@@ -93,7 +96,7 @@ For development, `run\` holds the working copy of the exe and its files, and `ru
 - Phases 0 to 6a are done and confirmed in the headset: stereo and head tracking, room-scale and comfort, VR menus, motion controls, hand models, the portable package.
 - Not tested yet: a Steam copy of the game, and controllers other than the Index.
 - Optional: a 64-bit build.
-- Before sharing the package: the source must be public (GPLv3), and there is no real installer yet (a zip of the package plus this README is the install method).
+- Sharing: the source is public (GPLv3); the package is a zip with `install.bat`. It ships no game files or game DLLs.
 
 ## Credits and licence
 - Game and engine code: © Frictional Games, released under the **GNU GPL v3** ([FrictionalGames/AmnesiaAMachineForPigs](https://github.com/FrictionalGames/AmnesiaAMachineForPigs)). This VR version is GPLv3 as well.
