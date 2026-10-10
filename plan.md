@@ -151,8 +151,8 @@ Every phase ends with something you can run and check.
 **Package contents** (about 25 MB, built in the project's `dist\AmnesiaAMFP_VR\`):
 | File | What |
 |---|---|
-| `aamfp_vr.exe` | our build (renamed so it can't be mixed up with the game's `aamfp.exe`) |
-| engine DLLs from `run\` | SDL2, glew32, DevIL, Newton, OpenAL32, wrap_oal, alut, ogg/vorbis/theora, zlibwapi, `openvr_api.dll` |
+| `aamfp_vr.exe` | launcher (`src\tools\vrlauncher`, static CRT, needs no game DLLs): finds the game folder, copies the game's 12 engine DLLs (SDL2, glew32, DevIL, Newton, OpenAL32, wrap_oal, alut, ogg/vorbis/theora, zlibwapi) from the player's own game folder next to itself when missing or changed (read-only folder: game folder put on PATH instead), then starts `aamfp_vr_game.exe` there. The package ships none of those DLLs (two are Creative's proprietary OpenAL). |
+| `aamfp_vr_game.exe`, `openvr_api.dll` | our game build and Valve's OpenVR runtime |
 | `msvcp140.dll`, `vcruntime140.dll` | x86 Visual C++ runtime (app-local, from VS `Microsoft.VC145.CRT`), so no VC++ 2015-2026 install is needed |
 | `vr_assets\` | hand models (CC0, with `License.md`) |
 | `vr_actions.json`, `vr_bindings_knuckles.json` | SteamVR Input |

@@ -21,14 +21,18 @@ Requirements
 
 Installing
 ----------
-Put this folder anywhere, for example inside the game's folder (then it finds the game by itself).
+Easiest: double-click install.bat. It finds your Epic or Steam copy of the game (or asks where it is), copies
+these files into a VR folder inside the game's folder, prepares everything and puts an "Amnesia AMFP VR"
+shortcut on your desktop. Then start SteamVR and the shortcut. Running it again keeps your vr_settings.cfg.
 
-Start aamfp_vr.exe. If the game is not found, you are asked once for the folder where the game is installed
+Without the installer: put this folder anywhere, for example inside the game's folder (then it finds the game by
+itself), and start aamfp_vr.exe. If the game is not found, you are asked once for the folder where the game is installed
 (the folder that contains aamfp.exe and resources.cfg). The answer is saved in vr_package.cfg; empty the
 GameFolder line there to be asked again.
 
-On the first start, 98 character animations are converted from your own game files into data_overlay (a few
-seconds). The game folder is only read, never changed. Saves and settings are shared with the normal game
+On the first start, the game's engine DLLs are copied from your game folder into this folder, and 98 character
+animations are converted from your own game files into data_overlay (a few seconds). Always start the game with
+aamfp_vr.exe (not aamfp_vr_game.exe). The game folder is only read, never changed. Saves and settings are shared with the normal game
 (Documents\Amnesia\Pig).
 
 Start with "aamfp_vr.exe -flat" to play without VR.
@@ -45,7 +49,7 @@ Recenter: click the right stick (or press F9).
 
 Uninstalling
 ------------
-Delete this folder.
+Delete this folder (the VR folder inside the game's folder) and the desktop shortcut.
 
 
 Licence
