@@ -1,0 +1,22 @@
+# MachineForPigsVR project repo: everything we wrote; nothing from the game, no build output, no saves.
+# (src/.gitignore covers the build output inside the source tree.)
+
+# Game-derived data (converted from Frictional's files) and personal saves
+/data_overlay/
+/backups/
+
+# Run folder: only our launchers and VR configuration (exe/DLLs are build output and dependencies)
+/run/*
+!/run/*.bat
+!/run/*.ps1
+!/run/vr_settings.cfg
+!/run/vr_actions.json
+!/run/vr_bindings_knuckles.json
+
+# Phase folders: reports, tools and settings only (no screenshots, captures, logs, game config copies, test saves)
+/phase*/*
+!/phase*/*.md
+!/phase*/tools/
+!/phase2/*.cfg
+!/run/vr_assets/
+dist/

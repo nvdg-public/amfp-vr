@@ -1,0 +1,62 @@
+{
+  "default_bindings": [
+    { "controller_type": "knuckles", "binding_url": "vr_bindings_knuckles.json" }
+  ],
+  "actions": [
+    { "name": "/actions/main/in/interact", "type": "boolean" },
+    { "name": "/actions/main/in/grab", "type": "boolean" },
+    { "name": "/actions/main/in/jump", "type": "boolean" },
+    { "name": "/actions/main/in/crouch", "type": "boolean" },
+    { "name": "/actions/main/in/recenter", "type": "boolean" },
+    { "name": "/actions/main/in/run", "type": "boolean" },
+    { "name": "/actions/main/in/lantern", "type": "boolean" },
+    { "name": "/actions/main/in/journal", "type": "boolean" },
+    { "name": "/actions/main/in/menu", "type": "boolean" },
+    { "name": "/actions/main/in/rotate", "type": "boolean" },
+    { "name": "/actions/main/in/interact_pull", "type": "vector1" },
+    { "name": "/actions/main/in/interact_left", "type": "boolean" },
+    { "name": "/actions/main/in/interact_left_pull", "type": "vector1" },
+    { "name": "/actions/main/in/move", "type": "vector2" },
+    { "name": "/actions/main/in/turn", "type": "vector2" },
+    { "name": "/actions/main/in/aim_left", "type": "pose" },
+    { "name": "/actions/main/in/aim_right", "type": "pose" },
+    { "name": "/actions/main/in/grip_left", "type": "pose" },
+    { "name": "/actions/main/in/grip_right", "type": "pose" },
+    { "name": "/actions/main/in/skeleton_left", "type": "skeleton", "skeleton": "/skeleton/hand/left" },
+    { "name": "/actions/main/in/skeleton_right", "type": "skeleton", "skeleton": "/skeleton/hand/right" },
+    { "name": "/actions/main/out/haptic_left", "type": "vibration" },
+    { "name": "/actions/main/out/haptic_right", "type": "vibration" }
+  ],
+  "action_sets": [
+    { "name": "/actions/main", "usage": "single" }
+  ],
+  "localization": [
+    {
+      "language_tag": "en_US",
+      "/actions/main": "Game",
+      "/actions/main/in/interact": "Interact / click",
+      "/actions/main/in/grab": "Grab / hold objects",
+      "/actions/main/in/jump": "Jump",
+      "/actions/main/in/crouch": "Crouch",
+      "/actions/main/in/recenter": "Recenter view",
+      "/actions/main/in/run": "Run (toggle)",
+      "/actions/main/in/lantern": "Lantern on/off",
+      "/actions/main/in/journal": "Journal",
+      "/actions/main/in/menu": "Pause menu / back",
+      "/actions/main/in/rotate": "Rotate held object",
+      "/actions/main/in/interact_pull": "Interact / click (trigger pull, soft press)",
+      "/actions/main/in/interact_left": "Interact with the left hand (when the lantern is away)",
+      "/actions/main/in/interact_left_pull": "Interact with the left hand (soft press)",
+      "/actions/main/in/move": "Walk",
+      "/actions/main/in/turn": "Turn (left/right), scroll (up/down)",
+      "/actions/main/in/aim_left": "Left hand pointer",
+      "/actions/main/in/aim_right": "Right hand pointer",
+      "/actions/main/in/grip_left": "Left hand",
+      "/actions/main/in/grip_right": "Right hand",
+      "/actions/main/in/skeleton_left": "Left hand fingers",
+      "/actions/main/in/skeleton_right": "Right hand fingers",
+      "/actions/main/out/haptic_left": "Left hand vibration",
+      "/actions/main/out/haptic_right": "Right hand vibration"
+    }
+  ]
+}
