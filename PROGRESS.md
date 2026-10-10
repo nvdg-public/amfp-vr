@@ -95,6 +95,10 @@ True VR (SteamVR, Valve Index, motion controls) for Amnesia: A Machine for Pigs.
 - **Grabbed decoration left a copy behind (2026-10-10, fixed, not yet confirmed):** only after loading a save. A save load reloads the map with `abLoadEntities=false` (only loaders with `GetCreatesStaticEntity`, i.e. the StaticProp loader, run), so converted decorations were created by the map load and again from the save (`cLuxSavedMap::ToMap`). Now ToMap reuses an existing entity with the same ID when it is a `cLuxProp_Object` with `GetVRStaticPropOrigin()`. Old saves without them keep the map-loaded ones.
 - `DevIL.dll` (identical to the Epic one) needs the VC++ 2005 x86 runtime; listed as a requirement in README, not shipped.
 
+## Public repo (2026-10-10)
+- Fresh repo without history at `<project folder>-public` (branch `main`, one commit, author `AMFP VR <amfp-vr@example.invalid>`, set in its local git config). Made by `private\export_public.py` (git-ignored): exports HEAD, replaces the name, user folder, PC name and personal paths (game path becomes the Epic default `C:\Program Files\Epic Games\AmnesiaAMFP`), then scans for leftovers (0 left, binaries included). To refresh: delete the folder's files (keep nothing) and re-run, or apply new changes there by hand. Pushed 2026-10-10 to https://gitea.vdghub.com/nvdg/machineForPigsVR-public.git (`origin`, branch `main`).
+- Still open for a public release: the 12 engine DLLs in the package come from the Epic install (incl. Creative's OpenAL). The exe no longer embeds the build path (build.bat: `/d1trimfile`, `/PDBALTPATH`; checked 2026-10-10).
+
 ## Next
 Phase 6a done (hands, two-handed interaction, lantern-hand interaction, grabbable decorations confirmed 2026-10-10). SteamVR keyboard and off-centre fix confirmed. Next (the tester gives the go-ahead): rest of Phase 6: packaging (launcher/installer), optional 64-bit build; performance work dropped. See `plan.md`.
 
