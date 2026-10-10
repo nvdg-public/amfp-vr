@@ -1,6 +1,6 @@
 @echo off
 rem Builds the HPL2 engine library and aamfp.exe (Release, Win32) with Visual Studio 2026 (toolset v145).
-rem Usage: build.bat [engine|game|all]   (default: all)
+rem Usage: build.bat [engine|game|all] [rebuild]   (default: all)
 setlocal
 set "ROOT=%~dp0"
 set "TARGET=%~1"
@@ -23,6 +23,14 @@ if not exist "%ROOT%tools\thirdparty\openvr\headers\openvr.h" (
 )
 
 set "MSB=/m /nologo /v:minimal /p:Configuration=Release /p:Platform=Win32"
+
+rem Keep the build folder out of the binaries: the exe stores only the .pdb file name, and __FILE__ strings
+rem start at the project folder (src\...) instead of the full path. cl.exe and link.exe read _CL_ / _LINK_.
+for %%i in ("%ROOT%..") do set "PROJ=%%~fi\"
+set "_CL_=/d1trimfile:%PROJ%"
+set "_LINK_=/PDBALTPATH:%%_PDB%%"
+rem Second argument "rebuild" rebuilds everything (needed after changing compiler options)
+if /i "%~2"=="rebuild" set "MSB=%MSB% /t:Rebuild"
 
 if /i "%TARGET%"=="game" goto game
 rem The prebuilt angelscript.lib is VS2010-built and does not link with v145; rebuild it into HPL2\lib
