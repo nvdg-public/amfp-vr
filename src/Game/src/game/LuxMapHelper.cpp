@@ -206,7 +206,6 @@ void cLuxAttackRayCallback::Setup(iPhysicsBody *apSkipBody)
 {
 	mpSkipBody = apSkipBody;
 	mbIntersection = false;
-	mpHitBody = NULL;
 }
 
 //-----------------------------------------------------------------------
@@ -223,7 +222,6 @@ bool cLuxAttackRayCallback::BeforeIntersect(iPhysicsBody *apBody)
 bool cLuxAttackRayCallback::OnIntersect(iPhysicsBody *apBody,cPhysicsRayParams *apParams)
 {
 	mbIntersection = true;
-	mpHitBody = apBody;
 	
 	return false;
 }
@@ -275,25 +273,6 @@ void cLuxMapHelper::Reset()
 
 //-----------------------------------------------------------------------
 
-/** VR: one hpl.log line per enemy attack that checks the player, to see why attacks miss. */
-static void LogVREnemyAttack(const cMatrixf& a_mtxBox, const cVector3f &avOrigin, int alStage, const tString &asBlocker)
-{
-	static const char *vStage[] = {"attack box too far", "shapes don't touch", "ray blocked", "HIT"};
-	cVector3f vPlayer = gpBase->mpPlayer->GetCharacterBody()->GetPosition();
-	cVector3f vBox = a_mtxBox.GetTranslation();
-	cVector3f vToPlayer = vPlayer - avOrigin;
-	cVector3f vToBox = vBox - avOrigin;
-	vToPlayer.y = 0; vToBox.y = 0;
-	float fAngle = 0;
-	if(vToPlayer.Length() > 0.01f && vToBox.Length() > 0.01f)
-		fAngle = cMath::ToDeg(acosf(cMath::Clamp(cMath::Vector3Dot(cMath::Vector3Normalize(vToPlayer), cMath::Vector3Normalize(vToBox)), -1.0f, 1.0f)));
-	Log("VR enemy attack: %s%s%s | enemy-player %.2f m (2D), player %.2f m from box centre, height diff %.2f, facing off by %.0f deg\n",
-		vStage[alStage], asBlocker.empty() ? "" : " by ", asBlocker.c_str(),
-		vToPlayer.Length(), cMath::Vector2DistXZ(vPlayer, vBox), vPlayer.y - vBox.y, fAngle);
-}
-
-//-----------------------------------------------------------------------
-
 bool cLuxMapHelper::ShapeDamage(iCollideShape *apShape, const cMatrixf& a_mtxTransform, const cVector3f &avOrigin,
 								float afMinDamage, float afMaxDamage, float afForce, float afMaxImpulse,
 								int alStrength, float afHitSpeed, eLuxDamageType aDamageType,eLuxWeaponHitType aWeaponHitType,
@@ -322,8 +301,6 @@ bool cLuxMapHelper::ShapeDamage(iCollideShape *apShape, const cMatrixf& a_mtxTra
 	//movement body, so enemies up close don't swing through the space in front of it.
 	iPhysicsBody *pVRPlayerBody = NULL;
 	iCollideShape *pVRPlayerHitShape = NULL;
-	int lVRPlayerStage = 0;	// for the log: 0 attack box bounds miss you, 1 shapes don't touch, 2 a body blocks the ray, 3 hit
-	tString sVRBlocker;
 	const cLuxVRSettings &vrSettings = cLuxVRSettings::Get();
 	if(abCheckPlayer && vrSettings.mbActive && vrSettings.mfEnemyHitWidth > vrSettings.mfBodyWidth)
 	{
@@ -340,11 +317,7 @@ bool cLuxMapHelper::ShapeDamage(iCollideShape *apShape, const cMatrixf& a_mtxTra
 
 	if(vBodies.empty())
 	{
-		if(pVRPlayerHitShape)
-		{
-			LogVREnemyAttack(a_mtxTransform, avOrigin, lVRPlayerStage, sVRBlocker);
-			pPhysicsWorld->DestroyShape(pVRPlayerHitShape);
-		}
+		if(pVRPlayerHitShape) pPhysicsWorld->DestroyShape(pVRPlayerHitShape);
 		return false;
 	}
 
@@ -391,14 +364,12 @@ bool cLuxMapHelper::ShapeDamage(iCollideShape *apShape, const cMatrixf& a_mtxTra
 			continue;
 		}
 		
-		if(pBody == pVRPlayerBody) lVRPlayerStage = 1;
 		bool bCollide = pPhysicsWorld->CheckShapeCollision(apShape, a_mtxTransform, pBodyShape, pBody->GetLocalMatrix(),
 															collideData,4, false);
 		if(bCollide==false)
 		{
 			continue;
 		}
-		if(pBody == pVRPlayerBody) lVRPlayerStage = 2;
 
 		///////////////////////
 		//Check ray cast
@@ -407,10 +378,8 @@ bool cLuxMapHelper::ShapeDamage(iCollideShape *apShape, const cMatrixf& a_mtxTra
 		pPhysicsWorld->CastRay(&mAttackRayCallback, avOrigin, pBody->GetWorldPosition(), true, false, false, true);
 		if(mAttackRayCallback.mbIntersection)
 		{
-			if(pBody == pVRPlayerBody && mAttackRayCallback.mpHitBody) sVRBlocker = mAttackRayCallback.mpHitBody->GetName();
 			continue;
 		}
-		if(pBody == pVRPlayerBody) lVRPlayerStage = 3;
 
 		//////////////////////
 		//Set up entities
@@ -516,11 +485,7 @@ bool cLuxMapHelper::ShapeDamage(iCollideShape *apShape, const cMatrixf& a_mtxTra
 
 	}
 
-	if(pVRPlayerHitShape)
-	{
-		LogVREnemyAttack(a_mtxTransform, avOrigin, lVRPlayerStage, sVRBlocker);
-		pPhysicsWorld->DestroyShape(pVRPlayerHitShape);
-	}
+	if(pVRPlayerHitShape) pPhysicsWorld->DestroyShape(pVRPlayerHitShape);
 
 	///////////////////////
 	//Get Closes Position

@@ -515,6 +515,8 @@ public:
 	cLuxPlayerDeath(cLuxPlayer *apPlayer);
 	~cLuxPlayerDeath();
 
+	bool IsActive(){ return mbActive; }
+
 	void LoadFonts();
 	void LoadUserConfig();
 	void SaveUserConfig();

@@ -443,6 +443,29 @@ void cLuxPlayer::Update(float afTimeStep)
 	}
 
 	////////////////////////
+	// Debug (HPL_VR_TEST_OUTOFMAP="seconds"): that long after each (re)spawn you are put 3 m beside the map's static
+	// geometry at your current height, so you fall out of the map and Body OutOfMapKill must kill you.
+	{
+		static const char *pTestOutOfMap = getenv("HPL_VR_TEST_OUTOFMAP");
+		static float fOutTime = 0;
+		static bool bOutDone = false;
+		if(pTestOutOfMap && gpBase->mpMapHandler->GetCurrentMap())
+		{
+			if(IsDead()) { fOutTime = 0; bOutDone = false; }
+			else if(bOutDone==false && (fOutTime += afTimeStep) > cMath::Max((float)atof(pTestOutOfMap), 1.0f))
+			{
+				iPhysicsWorld *pPhysicsWorld = gpBase->mpMapHandler->GetCurrentMap()->GetPhysicsWorld();
+				cVector3f vMin = pPhysicsWorld->GetWorldSizeMin(), vMax = pPhysicsWorld->GetWorldSizeMax();
+				cVector3f vFeet = mpCharBody->GetFeetPosition();
+				cVector3f vOut(vMax.x - 10.0f + 3.0f, vFeet.y, (vMin.z + vMax.z) * 0.5f);
+				mpCharBody->SetFeetPosition(vOut);
+				Log("VR test: put outside the map at %s (map x up to %.1f)\n", vOut.ToString().c_str(), vMax.x - 10.0f);
+				bOutDone = true;
+			}
+		}
+	}
+
+	////////////////////////
 	// Update head
 	UpdateHeadPosAdd(afTimeStep);
 	UpdateHeadSpin(afTimeStep);
@@ -464,13 +487,14 @@ void cLuxPlayer::Update(float afTimeStep)
 
 	////////////////////////
 	//VR: out of the map (pushed through a wall or floor) = dead, so you restart at the checkpoint instead of
-	//hanging stuck outside: more than 2 m below or 5 m beside the map's static geometry. The physics world is that
+	//hanging stuck outside: more than 2 m below or 1 m beside the map's static geometry. The physics world is that
 	//geometry's bounds + 10 m (cWorld::Compile); bodies stop moving at its edge.
-	if(cLuxVRSettings::Get().mbActive && cLuxVRSettings::Get().mbOutOfMapKill && IsDead()==false && gpBase->mpMapHandler->GetCurrentMap())
+	if(cLuxVRSettings::Get().mbActive && cLuxVRSettings::Get().mbOutOfMapKill && IsDead()==false && mpDeath->IsActive()==false &&
+		gpBase->mpMapHandler->GetCurrentMap())
 	{
 		iPhysicsWorld *pPhysicsWorld = gpBase->mpMapHandler->GetCurrentMap()->GetPhysicsWorld();
-		cVector3f vMin = pPhysicsWorld->GetWorldSizeMin() + cVector3f(5, 8, 5);
-		cVector3f vMax = pPhysicsWorld->GetWorldSizeMax() - cVector3f(5, 0, 5);
+		cVector3f vMin = pPhysicsWorld->GetWorldSizeMin() + cVector3f(9, 8, 9);
+		cVector3f vMax = pPhysicsWorld->GetWorldSizeMax() - cVector3f(9, 0, 9);
 		cVector3f vPos = mpCharBody->GetPosition();
 		if(vMax.x > vMin.x && vMax.z > vMin.z &&
 			(vPos.y < vMin.y || vPos.x < vMin.x || vPos.x > vMax.x || vPos.z < vMin.z || vPos.z > vMax.z))
@@ -717,7 +741,6 @@ void cLuxPlayer::GiveDamage(float afAmount, int alStrength, eLuxDamageType aType
 		cVRSystem::Get()->TriggerHaptic(eVRHand_Left, 0.25f, 60.0f, 1.0f);
 		cVRSystem::Get()->TriggerHaptic(eVRHand_Right, 0.25f, 60.0f, 1.0f);
 	}
-	Log("Player damaged: %.0f, health now %.0f\n", afAmount, mfHealth);
 
 	if(abSpinHead)
 		gpBase->mpHelpFuncs->PlayGuiSoundData(msHeadSpinHitSound, eSoundEntryType_Gui);
