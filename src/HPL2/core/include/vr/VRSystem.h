@@ -275,6 +275,7 @@ namespace hpl {
 		unsigned long long mlMoveAction, mlTurnAction;
 		unsigned long long mlInteractPullAction, mlInteractLeftPullAction;	// analog trigger pull: a soft press counts as Interact
 		float mfTriggerThreshold;
+		bool mbLeftHanded;	// Input LeftHanded: sticks, stick clicks and face buttons swap hands (UpdateInput)
 		unsigned long long mvAimAction[eVRHand_LastEnum], mvGripAction[eVRHand_LastEnum], mvHapticAction[eVRHand_LastEnum];
 		unsigned long long mvSkeletonAction[eVRHand_LastEnum];	// 0 if the manifest has no skeleton action
 		bool mvFingerValid[eVRHand_LastEnum];

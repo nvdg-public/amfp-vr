@@ -267,6 +267,17 @@ namespace hpl {
 		if(vr::VRInput()->GetAnalogActionData(mlTurnAction, &analog, sizeof(analog), vr::k_ulInvalidInputValueHandle) == vr::VRInputError_None && analog.bActive)
 			mvTurnAxis = ApplyDeadZone(analog.x, analog.y, mfStickDeadZone);
 
+		// Left-handed: the bindings are right-handed, so swap what each hand's stick and face buttons do
+		// (triggers and grips follow the pointer hand already). Mirror pairs as on the Index/Touch layout:
+		// B = jump / menu, A = crouch / journal, stick click = recenter / run.
+		if(mbLeftHanded)
+		{
+			std::swap(mvMoveAxis, mvTurnAxis);
+			std::swap(mvButtons[eVRButton_Run], mvButtons[eVRButton_Recenter]);
+			std::swap(mvButtons[eVRButton_Jump], mvButtons[eVRButton_Menu]);
+			std::swap(mvButtons[eVRButton_Crouch], mvButtons[eVRButton_Journal]);
+		}
+
 		// Turn stick up/down act as buttons (scrolling), with hysteresis; only when pushed mostly vertically
 		float fAbsY = cMath::Abs(mvTurnAxis.y);
 		bool bVertical = fAbsY > cMath::Abs(mvTurnAxis.x);
