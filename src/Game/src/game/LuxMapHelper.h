@@ -90,7 +90,6 @@ public:
 
 	iPhysicsBody *mpSkipBody;
 	bool mbIntersection;
-	iPhysicsBody *mpHitBody;	// the body that blocked the ray (VR attack log)
 };
 
 //----------------------------------------------
