@@ -1,0 +1,150 @@
+{
+  "action_manifest_version": 0,
+  "controller_type": "vive_controller",
+  "name": "Amnesia: A Machine for Pigs VR - HTC Vive wand default",
+  "description": "Left trackpad walks (click = run), right trackpad left/right turns; click the right trackpad up = jump, down = crouch, centre = recenter. Right grip grabs objects, right trigger interacts; the left grip and trigger do the same. Left grip at the left hip takes the lantern. Left menu button = pause menu, right menu button = journal.",
+  "bindings": {
+    "/actions/main": {
+      "sources": [
+        {
+          "path": "/user/hand/right/input/trigger",
+          "mode": "trigger",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/interact"
+            },
+            "pull": {
+              "output": "/actions/main/in/interact_pull"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/grip",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/grab"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/application_menu",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/journal"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "trackpad",
+          "inputs": {
+            "position": {
+              "output": "/actions/main/in/turn"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/right/input/trackpad",
+          "mode": "dpad",
+          "parameters": {
+            "sub_mode": "click",
+            "deadzone_pct": "50"
+          },
+          "inputs": {
+            "north": {
+              "output": "/actions/main/in/jump"
+            },
+            "south": {
+              "output": "/actions/main/in/crouch"
+            },
+            "center": {
+              "output": "/actions/main/in/recenter"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trigger",
+          "mode": "trigger",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/interact_left"
+            },
+            "pull": {
+              "output": "/actions/main/in/interact_left_pull"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/grip",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/rotate"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/application_menu",
+          "mode": "button",
+          "inputs": {
+            "click": {
+              "output": "/actions/main/in/menu"
+            }
+          }
+        },
+        {
+          "path": "/user/hand/left/input/trackpad",
+          "mode": "trackpad",
+          "inputs": {
+            "position": {
+              "output": "/actions/main/in/move"
+            },
+            "click": {
+              "output": "/actions/main/in/run"
+            }
+          }
+        }
+      ],
+      "poses": [
+        {
+          "output": "/actions/main/in/aim_left",
+          "path": "/user/hand/left/pose/tip"
+        },
+        {
+          "output": "/actions/main/in/aim_right",
+          "path": "/user/hand/right/pose/tip"
+        },
+        {
+          "output": "/actions/main/in/grip_left",
+          "path": "/user/hand/left/pose/grip"
+        },
+        {
+          "output": "/actions/main/in/grip_right",
+          "path": "/user/hand/right/pose/grip"
+        }
+      ],
+      "skeleton": [
+        {
+          "output": "/actions/main/in/skeleton_left",
+          "path": "/user/hand/left/input/skeleton/left"
+        },
+        {
+          "output": "/actions/main/in/skeleton_right",
+          "path": "/user/hand/right/input/skeleton/right"
+        }
+      ],
+      "haptics": [
+        {
+          "output": "/actions/main/out/haptic_left",
+          "path": "/user/hand/left/output/haptic"
+        },
+        {
+          "output": "/actions/main/out/haptic_right",
+          "path": "/user/hand/right/output/haptic"
+        }
+      ]
+    }
+  }
+}

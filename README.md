@@ -31,7 +31,7 @@ Saves and settings are shared with the normal game (`Documents\Amnesia\Pig`). Th
 
 Not needed: the newer Visual C++ 2015-2026 runtime (the package contains `msvcp140.dll` and `vcruntime140.dll`), and the converted animations (they are made from your game files during installation or on the first start).
 
-**Controllers**: default button bindings exist for **Index controllers** only. Other controllers (Vive wands, Oculus Touch, WMR) work after you bind the actions yourself in SteamVR > Settings > Controllers > Manage controller bindings.
+**Controllers**: default button bindings exist for **Index controllers**, **Quest 2/3 (Oculus Touch)**, **HTC Vive wands** and **Steam Frame controllers**. Only the Index ones are tested on real hardware. Other controllers (WMR and others) work after you bind the actions yourself in SteamVR > Settings > Controllers > Manage controller bindings, where you can also change any default.
 
 ---
 
@@ -54,6 +54,12 @@ You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 11 MB). It conta
 **Without the installer**: copy the package folder anywhere (inside the game's folder is easiest) and start `aamfp_vr.exe` in it. It asks once where the game is installed if it isn't the parent folder, and does the DLL and animation steps itself on the first start. Always start `aamfp_vr.exe`, not `aamfp_vr_game.exe`.
 
 **Buttons (Index controllers)**: left stick walk (click = run), right stick snap turn (click = recenter), right trigger use/click, right grip grab (let go mid-swing to throw), left grip at your left hip = lantern, left A journal, left B pause menu, right A crouch, right B jump.
+
+**Buttons (Quest 2/3)**: as on the Index, with X journal and Y pause menu. Finger curl comes from the touch sensors.
+
+**Buttons (Steam Frame)**: as on the Index, with left d-pad down = journal and View (or right Menu) = pause menu.
+
+**Buttons (Vive wands)**: left trackpad walk (click = run), right trackpad left/right turn; click the right trackpad up = jump, down = crouch, centre = recenter. Left menu button = pause menu, right menu button = journal. Trigger, grip and lantern as on the Index; the hands close with the grip and trigger.
 
 **Settings**: open `vr_settings.cfg` in the `VR` folder with any text editor. Every option is explained in it.
 
@@ -96,7 +102,7 @@ For development, `run\` holds the working copy of the exe and its files, and `ru
 
 ## Status and open points
 - Phases 0 to 6a are done and confirmed in the headset: stereo and head tracking, room-scale and comfort, VR menus, motion controls, hand models, the portable package.
-- Not tested yet: a Steam copy of the game, and controllers other than the Index.
+- Not tested yet: a Steam copy of the game, and controllers other than the Index (Quest, Vive and Steam Frame bindings are untested defaults).
 - Optional: a 64-bit build.
 - Sharing: the source is public (GPLv3); the package is a zip with `install.bat`. It ships no game files or game DLLs.
 

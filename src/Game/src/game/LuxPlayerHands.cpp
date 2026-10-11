@@ -743,18 +743,18 @@ void cLuxPlayerHands::UpdateVRHands(const cMatrixf& a_mtxSeatedToWorld)
 			mtxLocal.SetTranslation(cVector3f(settings.mvHandOffset.x * fMirror, settings.mvHandOffset.y, settings.mvHandOffset.z));
 			mvVRHandEntity[i]->SetMatrix(cMath::MatrixMul(a_mtxSeatedToWorld, cMath::MatrixMul(mtxAim, mtxLocal)));
 
-			// Finger curls: SteamVR skeletal summary; without it the right grip/trigger close the right hand
+			// Finger curls: SteamVR skeletal summary; without it (Vive wands) the hand's grip/trigger close it
 			float vTarget[5] = {0,0,0,0,0};
 			if(bFake)
 			{
 				float fT = 0.5f + 0.5f*sin((float)cPlatform::GetApplicationTime() * 0.0015f);
 				for(int f=0; f<5; ++f) vTarget[f] = fT;
 			}
-			else if(pVR->GetFingerCurls(hand, vTarget)==false && hand==eVRHand_Right)
+			else if(pVR->GetFingerCurls(hand, vTarget)==false)
 			{
-				float fGrip = pVR->GetHandGrip(eVRHand_Right) ? 1.0f : 0.0f;
+				float fGrip = pVR->GetHandGrip(hand) ? 1.0f : 0.0f;
 				vTarget[0] = fGrip * 0.7f; vTarget[2] = vTarget[3] = vTarget[4] = fGrip;
-				vTarget[1] = pVR->GetHandTrigger(eVRHand_Right) ? 1.0f : fGrip;
+				vTarget[1] = pVR->GetHandTrigger(hand) ? 1.0f : fGrip;
 			}
 			// The lantern hand holds the handle
 			if(bLanternOut && hand==pVR->GetLanternHand())
