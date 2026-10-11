@@ -113,3 +113,5 @@ For development, `run\` holds the working copy of the exe and its files, and `ru
 
 ## Disclaimer
 Unofficial fan-made VR mod. It is not affiliated with, endorsed by or supported by Frictional Games or The Chinese Room. "Amnesia" and "A Machine for Pigs" are names of their respective owners; they are used here only to say which game this mod is for. You need your own copy of the game.
+
+Finally, **this mod has been made via Claude AI**. If you do not support/don't want to use AI generated content, then do not use this mod.
