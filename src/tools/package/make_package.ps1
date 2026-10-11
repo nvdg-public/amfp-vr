@@ -31,7 +31,7 @@ Copy-Item $launcher (Join-Path $out 'aamfp_vr.exe')
 Copy-Item $exe (Join-Path $out 'aamfp_vr_game.exe')
 Copy-Item (Join-Path $run 'openvr_api.dll') $out
 foreach ($d in 'msvcp140.dll','vcruntime140.dll') { Copy-Item (Join-Path $crt.FullName $d) $out }
-foreach ($f in 'vr_actions.json','vr_bindings_knuckles.json','vr_settings.cfg') { Copy-Item (Join-Path $run $f) $out }
+foreach ($f in 'vr_actions.json','vr_bindings_knuckles.json','vr_bindings_oculus_touch.json','vr_bindings_vive_controller.json','vr_bindings_frame_controller.json','vr_settings.cfg') { Copy-Item (Join-Path $run $f) $out }
 Copy-Item (Join-Path $run 'vr_assets') $out -Recurse
 # No converted animations in the package (they are made from game files): the exe converts them on first start
 Copy-Item (Join-Path $root 'src\tools\fbx2anm\fbx2anm.exe') $out

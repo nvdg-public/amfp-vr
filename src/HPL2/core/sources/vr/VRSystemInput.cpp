@@ -292,9 +292,13 @@ namespace hpl {
 														pose.pose.mDeviceToAbsoluteTracking.m[2][0], pose.pose.mDeviceToAbsoluteTracking.m[2][1], pose.pose.mDeviceToAbsoluteTracking.m[2][2], pose.pose.mDeviceToAbsoluteTracking.m[2][3],
 														0, 0, 0, 1);
 
-			// Finger curls (skeletal summary: Index finger tracking, or SteamVR's estimate from the buttons)
+			// Finger curls (skeletal summary: Index finger tracking, Quest/Frame touch sensors). Controllers with only an
+			// estimated skeleton (Vive wands) are left invalid so the game closes the hand from the grip/trigger instead.
 			vr::VRSkeletalSummaryData_t summary;
+			vr::EVRSkeletalTrackingLevel trackingLevel = vr::VRSkeletalTracking_Estimated;
 			mvFingerValid[i] = mvSkeletonAction[i] != 0 &&
+								vr::VRInput()->GetSkeletalTrackingLevel(mvSkeletonAction[i], &trackingLevel) == vr::VRInputError_None &&
+								trackingLevel >= vr::VRSkeletalTracking_Partial &&
 								vr::VRInput()->GetSkeletalSummaryData(mvSkeletonAction[i], vr::VRSummaryType_FromDevice, &summary) == vr::VRInputError_None;
 			if(mvFingerValid[i])
 			{

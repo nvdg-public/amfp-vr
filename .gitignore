@@ -11,7 +11,7 @@
 !/run/*.ps1
 !/run/vr_settings.cfg
 !/run/vr_actions.json
-!/run/vr_bindings_knuckles.json
+!/run/vr_bindings_*.json
 
 # Phase folders: reports, tools and settings only (no screenshots, captures, logs, game config copies, test saves)
 /phase*/*
