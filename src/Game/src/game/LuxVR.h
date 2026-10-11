@@ -81,6 +81,9 @@ public:
 	float mfLanternHipRadius;
 	float mfInteractReach;	// metres: doors, levers, wheels, drawers only react this close to the controller tip
 	float mfBodyWidth;		// metres: width of the player's collision body in VR (flat game: 0.8)
+	bool mbOutOfMapKill;	// you die when pushed/fallen out of the map (2 m below or 5 m beside its static geometry)
+	float mfEnemyAimAssist;	// radians: an enemy attack is aimed at you when you're within this angle of where it faces (0 = off)
+	float mfEnemyHitWidth;	// metres: width of the player when enemy attacks test for a hit (flat game: the body, 0.8)
 	bool mbRealCrouchKeepHeight;	// real crouch: stealth crouch, but the view stays at your real head height
 
 	float mfReticleSize;	// width in metres of the 800-unit crosshair area at 1 m distance
@@ -122,7 +125,7 @@ private:
 		mbHeadSpin = false; mLookAt = eLookAt_Snap;
 		mbHeadBob = false; mfScreenShake = 0.3f;
 		mbRadialBlur = false; mbImageTrail = false;
-		mbLanternInHand = true; mbLanternUpright = true; mLanternTurn = eLanternTurn_Point; mfLanternArmPivot = 0.5f; mvLanternOffset = 0; mfLanternYaw = cMath::ToRad(90.0f); mbHaptics = true; mbShowControllers = false; mbShowHands = true; mbOffHandInteract = true; mbLanternHandInteract = true; mbBothHandsHold = true; mfGrabSmallProps = 0.5f; mvGrabSmallPropsExclude.clear(); cString::GetStringVec(kLuxVRGrabSmallPropsExclude, mvGrabSmallPropsExclude); mvHandOffset = cVector3f(0.03f, -0.04f, 0.14f); mvHandRotation = 0; mfFingerCurl = 85.0f; mfThrowMul = 1.0f; mfThrowMaxSpeed = 10.0f; mfInteractStrength = 1.0f; mfGrabReach = 0.15f; mbLanternHip = true; mvLanternHipOffset = cVector3f(0.2f, -0.7f, 0.15f); mfLanternHipRadius = 0.25f; mfInteractReach = 0.2f; mfBodyWidth = 0.3f; mbRealCrouchKeepHeight = true;
+		mbLanternInHand = true; mbLanternUpright = true; mLanternTurn = eLanternTurn_Point; mfLanternArmPivot = 0.5f; mvLanternOffset = 0; mfLanternYaw = cMath::ToRad(90.0f); mbHaptics = true; mbShowControllers = false; mbShowHands = true; mbOffHandInteract = true; mbLanternHandInteract = true; mbBothHandsHold = true; mfGrabSmallProps = 0.5f; mvGrabSmallPropsExclude.clear(); cString::GetStringVec(kLuxVRGrabSmallPropsExclude, mvGrabSmallPropsExclude); mvHandOffset = cVector3f(0.03f, -0.04f, 0.14f); mvHandRotation = 0; mfFingerCurl = 85.0f; mfThrowMul = 1.0f; mfThrowMaxSpeed = 10.0f; mfInteractStrength = 1.0f; mfGrabReach = 0.15f; mbLanternHip = true; mvLanternHipOffset = cVector3f(0.2f, -0.7f, 0.15f); mfLanternHipRadius = 0.25f; mfInteractReach = 0.2f; mfBodyWidth = 0.3f; mfEnemyHitWidth = 0.8f; mfEnemyAimAssist = cMath::ToRad(90.0f); mbOutOfMapKill = true; mbRealCrouchKeepHeight = true;
 		mfReticleSize = 0.6f; mfReticleMinDist = 0.3f; mfReticleMaxDist = 8.0f;
 		if(pCfg==NULL) return;
 
@@ -173,6 +176,9 @@ private:
 		mfLanternHipRadius = cMath::Clamp(pCfg->GetFloat("Hands", "LanternHipRadius", 0.25f), 0.05f, 1.0f);
 		mfInteractReach = cMath::Clamp(pCfg->GetFloat("Hands", "InteractReach", 0.2f), 0.0f, 3.0f);
 		mfBodyWidth = cMath::Clamp(pCfg->GetFloat("Body", "CollisionWidth", 0.3f), 0.2f, 0.8f);
+		mbOutOfMapKill = pCfg->GetBool("Body", "OutOfMapKill", true);
+		mfEnemyAimAssist = cMath::ToRad(cMath::Clamp(pCfg->GetFloat("Body", "EnemyAimAssist", 90.0f), 0.0f, 180.0f));
+		mfEnemyHitWidth = cMath::Clamp(pCfg->GetFloat("Body", "EnemyHitWidth", 0.8f), 0.2f, 1.5f);
 		mbRealCrouchKeepHeight = pCfg->GetBool("Body", "RealCrouchKeepsHeight", true);
 
 		mfReticleSize = 0.6f * cMath::Clamp(pCfg->GetFloat("Reticle", "Size", 1.0f), 0.2f, 5.0f);

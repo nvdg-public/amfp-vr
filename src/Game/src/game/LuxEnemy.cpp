@@ -27,6 +27,7 @@
 #include "LuxMapHandler.h"
 #include "LuxPlayer.h"
 #include "LuxPlayerHelpers.h"
+#include "LuxVR.h"
 #include "LuxInteractConnections.h"
 #include "LuxMusicHandler.h"
 #include "LuxEffectRenderer.h"
@@ -2009,7 +2010,30 @@ bool iLuxEnemy::TriggersDisabled()
 bool iLuxEnemy::Attack(const cEnemyAttackSizeData &aSizeData, const cEnemyAttackDamageData &aDamageData, float afDamageMul)
 {
 	bool bHitPlayer = false;
-	bool bHit = gpBase->mpMapHelper->ShapeDamage(GetAttackShape(aSizeData.mlShapeIdx), GetDamageShapeMatrix(aSizeData.mvOffset), mpCharBody->GetPosition(),
+	cMatrixf mtxDamage = GetDamageShapeMatrix(aSizeData.mvOffset);
+
+	//VR: you can step around an enemy during its swing (room-scale), so the swing is aimed at you when you're
+	//within Body EnemyAimAssist of where it faces (headset test: misses with the enemy facing 57-133 deg away).
+	const cLuxVRSettings &vrSettings = cLuxVRSettings::Get();
+	if(vrSettings.mbActive && aDamageData.mbCheckPlayer && vrSettings.mfEnemyAimAssist > 0 && gpBase->mpPlayer->IsDead()==false)
+	{
+		cVector3f vPos = mpCharBody->GetPosition();
+		cVector3f vPlayerPos = gpBase->mpPlayer->GetCharacterBody()->GetPosition();
+		float fPlayerYaw = -cMath::GetAngleFromPoints2D(cVector2f(vPos.x, vPos.z), cVector2f(vPlayerPos.x, vPlayerPos.z));
+		if(cMath::Vector2DistXZ(vPos, vPlayerPos) > 0.01f &&
+			fabs(cMath::GetAngleDistanceRad(mpCharBody->GetYaw(), fPlayerYaw)) <= vrSettings.mfEnemyAimAssist)
+		{
+			cVector3f vForward = vPlayerPos - vPos;
+			vForward.y = 0;
+			vForward.Normalize();
+			cVector3f vRight = cMath::Vector3Cross(vForward, mpCharBody->GetUp());
+			mtxDamage = cMath::MatrixRotate(cVector3f(0, fPlayerYaw, 0), eEulerRotationOrder_XYZ);
+			mtxDamage.SetTranslation(vPos + vRight * aSizeData.mvOffset.x + mpCharBody->GetUp() * aSizeData.mvOffset.y +
+									vForward * aSizeData.mvOffset.z);
+		}
+	}
+
+	bool bHit = gpBase->mpMapHelper->ShapeDamage(GetAttackShape(aSizeData.mlShapeIdx), mtxDamage, mpCharBody->GetPosition(),
 												aDamageData.mfMinDamage*afDamageMul, aDamageData.mfMaxDamage*afDamageMul, 
 												aDamageData.mfForce, aDamageData.mfMaxImpulse, 
 												aDamageData.mlStrength, aDamageData.mfHitSpeed,

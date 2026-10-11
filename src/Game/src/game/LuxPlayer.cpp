@@ -463,6 +463,25 @@ void cLuxPlayer::Update(float afTimeStep)
 	if(mpCharBody->GetPosition().y < mfAutoKillYPos) SetHealth(0);
 
 	////////////////////////
+	//VR: out of the map (pushed through a wall or floor) = dead, so you restart at the checkpoint instead of
+	//hanging stuck outside: more than 2 m below or 5 m beside the map's static geometry. The physics world is that
+	//geometry's bounds + 10 m (cWorld::Compile); bodies stop moving at its edge.
+	if(cLuxVRSettings::Get().mbActive && cLuxVRSettings::Get().mbOutOfMapKill && IsDead()==false && gpBase->mpMapHandler->GetCurrentMap())
+	{
+		iPhysicsWorld *pPhysicsWorld = gpBase->mpMapHandler->GetCurrentMap()->GetPhysicsWorld();
+		cVector3f vMin = pPhysicsWorld->GetWorldSizeMin() + cVector3f(5, 8, 5);
+		cVector3f vMax = pPhysicsWorld->GetWorldSizeMax() - cVector3f(5, 0, 5);
+		cVector3f vPos = mpCharBody->GetPosition();
+		if(vMax.x > vMin.x && vMax.z > vMin.z &&
+			(vPos.y < vMin.y || vPos.x < vMin.x || vPos.x > vMax.x || vPos.z < vMin.z || vPos.z > vMax.z))
+		{
+			Log("VR: player out of the map at (%.1f %.1f %.1f), map (%.1f %.1f %.1f)-(%.1f %.1f %.1f): killed\n",
+				vPos.x, vPos.y, vPos.z, vMin.x, vMin.y, vMin.z, vMax.x, vMax.y, vMax.z);
+			SetHealth(0);
+		}
+	}
+
+	////////////////////////
 	// Update misc
 	CheckCollisionCallback("Player", gpBase->mpMapHandler->GetCurrentMap());
 	UpdateCamera(afTimeStep);
@@ -691,6 +710,14 @@ void cLuxPlayer::GiveDamage(float afAmount, int alStrength, eLuxDamageType aType
 	mpHudEffect->AddDamageSplash(aType);
 	mpHudEffect->Flash(cColor(0.6f,0,0, 0.5f),eGuiMaterial_Alpha,0,0.25f);
 	if(abSpinHead) SpinHead(mfHeadSpinDamageSpeed);
+
+	//VR: the head spin (the flat game's big "you got hit" cue) is off for comfort, so both controllers buzz instead
+	if(cLuxVRSettings::Get().mbActive && cLuxVRSettings::Get().mbHaptics && cVRSystem::Get())
+	{
+		cVRSystem::Get()->TriggerHaptic(eVRHand_Left, 0.25f, 60.0f, 1.0f);
+		cVRSystem::Get()->TriggerHaptic(eVRHand_Right, 0.25f, 60.0f, 1.0f);
+	}
+	Log("Player damaged: %.0f, health now %.0f\n", afAmount, mfHealth);
 
 	if(abSpinHead)
 		gpBase->mpHelpFuncs->PlayGuiSoundData(msHeadSpinHitSound, eSoundEntryType_Gui);

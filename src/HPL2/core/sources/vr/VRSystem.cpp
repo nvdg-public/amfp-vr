@@ -162,6 +162,7 @@ namespace hpl {
 		mPointerHand = mActiveHand = eVRHand_Right;
 		mlActiveHandSwitchTime = 0;
 		mbHandPointer = true;
+		mbLeftHanded = false;
 		mfStickDeadZone = 0.15f;
 		mlActionSet = mlMoveAction = mlTurnAction = mlInteractPullAction = mlInteractLeftPullAction = 0;
 		mfTriggerThreshold = 0.5f;
@@ -518,7 +519,8 @@ namespace hpl {
 		mfHeadMaxUp = cfg.GetFloat("Body", "MaxHeadRise", 0.15f);
 		mvMirrorSize.x = cfg.GetInt("Mirror", "Width", 1280);
 		mvMirrorSize.y = cfg.GetInt("Mirror", "Height", 720);
-		mPointerHand = cString::ToLowerCase(cfg.GetString("Input", "Hand", "Right")) == "left" ? eVRHand_Left : eVRHand_Right;
+		mbLeftHanded = cfg.GetBool("Input", "LeftHanded", false);
+		mPointerHand = cString::ToLowerCase(cfg.GetString("Input", "Hand", mbLeftHanded ? "Left" : "Right")) == "left" ? eVRHand_Left : eVRHand_Right;
 		mActiveHand = mPointerHand;
 		mbHandPointer = cString::ToLowerCase(cfg.GetString("Input", "Pointer", "Hand")) != "head";
 		mfStickDeadZone = cMath::Clamp(cfg.GetFloat("Input", "StickDeadZone", 0.15f), 0.0f, 0.8f);
