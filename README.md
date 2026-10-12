@@ -1,6 +1,6 @@
 # Amnesia: A Machine for Pigs VR
 
-A true virtual reality version of **Amnesia: A Machine for Pigs** for **SteamVR**, made and tested with a **Valve Index**.
+A true virtual reality version of **Amnesia: A Machine for Pigs** for **SteamVR**, made with a **Valve Index** and also tested with an **Oculus Quest 2**.
 
 It is not a VorpX-style wrapper. It is a **source port**: Frictional Games released the game's full source code (engine and game) under the GPLv3 in 2020, and this project builds its own game exe from that code with VR built into the renderer and the player code. It runs on **your own copy of the game** and only reads its files; it never changes the game folder.
 
@@ -25,13 +25,13 @@ Saves and settings are shared with the normal game (`Documents\Amnesia\Pig`). Th
 | **Windows 10 or 11, 64-bit** | The game is 32-bit, which runs fine on 64-bit Windows. |
 | **A VR-capable graphics card** | NVIDIA or AMD, roughly GTX 1070 / RX 5700 or better. |
 | **The latest NVIDIA or AMD graphics driver** | The game needs proper OpenGL support. Restart after installing. |
-| **Steam + SteamVR** and a **SteamVR headset** | A free Steam account is enough. Install SteamVR from Steam (Library > Tools) and finish its room setup. Tested with the **Valve Index**. |
-| **Your own copy of Amnesia: A Machine for Pigs** | **Epic Games Store**: tested. **Steam** (app 239200): very likely the same files, not tested yet. Other stores: not tested. Start the normal game once to check it works. |
+| **Steam + SteamVR** and a **SteamVR headset** | A free Steam account is enough. Install SteamVR from Steam (Library > Tools) and finish its room setup. Tested with the **Valve Index** and the **Oculus Quest 2**. |
+| **Your own copy of Amnesia: A Machine for Pigs** | **Epic Games Store** and **Steam** (app 239200): tested. Other stores: not tested. Start the normal game once to check it works. |
 | **Visual C++ 2005 SP1 Redistributable (x86)** | Needed by the game's own `DevIL.dll` (the Epic install only brings the 2010 one). Get **"Microsoft Visual C++ 2005 Service Pack 1 Redistributable Package MFC Security Update"**, `vcredist_x86.exe`, from microsoft.com. Without it the game won't start (missing MSVCR80.dll / side-by-side error). |
 
 Not needed: the newer Visual C++ 2015-2026 runtime (the package contains `msvcp140.dll` and `vcruntime140.dll`), and the converted animations (they are made from your game files during installation or on the first start).
 
-**Controllers**: default button bindings exist for **Index controllers**, **Quest 2/3 (Oculus Touch)**, **HTC Vive wands** and **Steam Frame controllers**. Only the Index ones are tested on real hardware. Other controllers (WMR and others) work after you bind the actions yourself in SteamVR > Settings > Controllers > Manage controller bindings, where you can also change any default.
+**Controllers**: default button bindings exist for **Index controllers**, **Quest 2/3 (Oculus Touch)**, **HTC Vive wands** and **Steam Frame controllers**. The Index and Quest 2 ones are tested on real hardware; Vive wands and Steam Frame controllers are not yet. Other controllers (WMR and others) work after you bind the actions yourself in SteamVR > Settings > Controllers > Manage controller bindings, where you can also change any default.
 
 ---
 
@@ -84,6 +84,7 @@ Only needed to build the exe and the package yourself. On top of the requirement
    powershell -ExecutionPolicy Bypass -File src\tools\package\deploy_to_epic.ps1
    ```
    `make_package.ps1` builds `dist\AmnesiaAMFP_VR`. `deploy_to_epic.ps1` runs that package's `install.ps1` for the given game folder (the same installer players use). For a Steam copy use `deploy_to_steam.ps1`, which finds the game in your Steam libraries. Both accept `-Game "<folder>"`.
+7. For a download zip: `src\make_release.bat` does a full rebuild, makes the package and zips it to `dist\amfp-vr-v<yyyyMMdd-HHmm>.zip` (with an empty `vr_package.cfg`).
 
 For development, `run\` holds the working copy of the exe and its files, and `run\play_vr.bat` starts it against the Epic game folder.
 
@@ -100,7 +101,7 @@ For development, `run\` holds the working copy of the exe and its files, and `ru
 
 ## Status and open points
 - Phases 0 to 6a are done and confirmed in the headset: stereo and head tracking, room-scale and comfort, VR menus, motion controls, hand models, the portable package.
-- Not tested yet: a Steam copy of the game, and controllers other than the Index (Quest, Vive and Steam Frame bindings are untested defaults).
+- Tested with the Epic and Steam copies of the game, with the Valve Index and the Oculus Quest 2. Not tested yet: Vive wands and Steam Frame controllers (their bindings are untested defaults).
 - Optional: a 64-bit build.
 - Sharing: the source is public (GPLv3); the package is a zip with `install.bat`. It ships no game files or game DLLs.
 
