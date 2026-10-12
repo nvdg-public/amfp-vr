@@ -170,7 +170,7 @@ Every phase ends with something you can run and check.
 
 **Undo:** delete `AmnesiaAMFP\VR\` and the shortcut. Epic's Verify ignores the extra folder; uninstalling the game through Epic deletes it too.
 
-**Requirements on another PC:** Windows 10/11, SteamVR, the user's own copy of the game (Epic tested; Steam/GOG very likely the same files but unverified), and the Visual C++ 2005 x86 runtime that the game's own `DevIL.dll` needs (the flat game needs it too, so it is normally already installed). **Never ship game data.** The code is GPLv3: sharing the package means the source must be available too.
+**Requirements on another PC:** Windows 10/11, SteamVR, the user's own copy of the game (Epic and Steam tested; GOG very likely the same files but unverified), and the Visual C++ 2005 x86 runtime that the game's own `DevIL.dll` needs (the flat game needs it too, so it is normally already installed). **Never ship game data.** The code is GPLv3: sharing the package means the source must be available too.
 
 #### Phase 6a: hand models (replacing the controller models)
 **Source:** Godot XR Tools hand models by Miodrag Sejic (DigitalN8m4r3), **CC0 1.0** (github.com/GodotVR/godot-xr-tools, `addons/godot-xr-tools/hands`). Chosen by the tester on 2026-10-08, with the **african** skin texture. CC0 means we may ship them with the port; we keep their `License.md` next to them anyway. (Rejected: the Sclerosis/Auto Hand hands, which can't be reused; RRFreelance's Asset Store gloves, which can't be shipped as loose files.)

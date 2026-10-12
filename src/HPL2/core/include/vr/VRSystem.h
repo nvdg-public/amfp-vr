@@ -172,6 +172,10 @@ namespace hpl {
 		/** The loaded vr_settings.cfg (never NULL once VR is active), for game-side settings. */
 		cConfigFile* GetConfig() const { return mpConfig; }
 
+		/** Comfort vignette: the player's artificial movement speed (m/s, stick/keyboard walking, not room-scale),
+			set by the game every logic step. Smooth turning is measured here from the body yaw. */
+		void SetComfortMoveSpeed(float afSpeed){ mfVignetteMoveSpeed = afSpeed; }
+
 		//// SteamVR keyboard for text fields (Menu Keyboard) ////////////////
 		/** Opens the SteamVR keyboard for apOwner (e.g. a text box); typing replaces its text. False if not available. */
 		bool ShowKeyboard(void *apOwner, const tWString &asText, int alMaxLength);
@@ -311,6 +315,13 @@ namespace hpl {
 		float mfMenuDistance, mfMenuWidth, mfMenuHeight;
 		int mlRecenterKey;
 		bool mbMirrorEnabled;
+
+		// Comfort vignette (vr_settings.cfg Vignette): darkens the edges of the view during artificial movement
+		void DrawVignette();
+		bool mbVignette, mbVignetteOnTurn;
+		float mfVignetteStrength, mfVignetteFadeIn, mfVignetteFadeOut;
+		float mfVignetteMoveSpeed, mfVignetteTurnRate, mfVignetteAmount;
+		double mfVignetteLastTime;
 		bool mbEdgeSmooth;
 		int mlRenderingEye;
 

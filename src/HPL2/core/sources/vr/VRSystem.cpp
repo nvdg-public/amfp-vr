@@ -131,6 +131,10 @@ namespace hpl {
 		mpInterpCamera = NULL;
 		mvBodyPrevPos = mvBodyCurPos = mvRenderBodyPos = 0;
 		mfBodyPrevYaw = mfBodyCurYaw = mfRenderBodyYaw = 0;
+		mbVignette = mbVignetteOnTurn = true;
+		mfVignetteStrength = 0.5f; mfVignetteFadeIn = 0.15f; mfVignetteFadeOut = 0.4f;
+		mfVignetteMoveSpeed = mfVignetteTurnRate = mfVignetteAmount = 0;
+		mfVignetteLastTime = 0;
 		mfBodyChangeTime = 0;
 		mfLogicStep = 1.0f/60.0f;
 
@@ -215,6 +219,8 @@ namespace hpl {
 
 			// Teleports and big (snap) turns snap
 			float fYawJump = cMath::Abs(cMath::GetAngleDistanceRad(mfBodyPrevYaw, mfBodyCurYaw));
+			// Smooth turning speed for the comfort vignette (snap turns are instant: no vignette)
+			mfVignetteTurnRate = fYawJump > cMath::ToRad(15.0f) ? 0 : fYawJump / cMath::Max(mfLogicStep, 0.001f);
 			if(cMath::Vector3Dist(mvBodyPrevPos, mvBodyCurPos) > 1.0f || fYawJump > cMath::ToRad(15.0f))
 			{
 				mvBodyPrevPos = mvBodyCurPos; mfBodyPrevYaw = mfBodyCurYaw;
@@ -525,6 +531,11 @@ namespace hpl {
 		mbHandPointer = cString::ToLowerCase(cfg.GetString("Input", "Pointer", "Hand")) != "head";
 		mfStickDeadZone = cMath::Clamp(cfg.GetFloat("Input", "StickDeadZone", 0.15f), 0.0f, 0.8f);
 		mfTriggerThreshold = cMath::Clamp(cfg.GetFloat("Input", "TriggerThreshold", 0.5f), 0.05f, 1.0f);
+		mbVignette = cfg.GetBool("Vignette", "Enabled", true);
+		mbVignetteOnTurn = cfg.GetBool("Vignette", "OnTurn", true);
+		mfVignetteStrength = cMath::Clamp(cfg.GetFloat("Vignette", "Strength", 0.5f), 0.0f, 1.0f);
+		mfVignetteFadeIn = cMath::Clamp(cfg.GetFloat("Vignette", "FadeIn", 0.15f), 0.0f, 3.0f);
+		mfVignetteFadeOut = cMath::Clamp(cfg.GetFloat("Vignette", "FadeOut", 0.4f), 0.0f, 3.0f);
 
 		////////////////////////////////
 		// Environment overrides (for tests and quick experiments)
@@ -919,10 +930,116 @@ namespace hpl {
 
 	//-----------------------------------------------------------------------
 
+	/**
+	 * Comfort vignette: during artificial movement (stick/keyboard walking, smooth turning) the edges of both eye
+	 * images fade to black, so the moving periphery (the main cause of motion sickness) is hidden. Real head and
+	 * room-scale movement never trigger it, snap turns neither. Drawn into the eye textures right before submitting.
+	 */
+	void cVRSystem::DrawVignette()
+	{
+		double fNow = SecondsNow();
+		float fDt = mfVignetteLastTime > 0 ? (float)(fNow - mfVignetteLastTime) : 0;
+		mfVignetteLastTime = fNow;
+		if(fDt > 0.1f) fDt = 0.1f;
+
+		////////////////////////////
+		// Target from the movement of the last logic steps (nothing moved for a while = paused or standing still)
+		float fTarget = 0;
+		if(mbVignette && fNow - mfBodyChangeTime < 2.5 * mfLogicStep)
+		{
+			float fMove = cMath::Clamp((mfVignetteMoveSpeed - 0.2f) / 1.2f, 0.0f, 1.0f);
+			float fTurn = mbVignetteOnTurn ? cMath::Clamp((cMath::ToDeg(mfVignetteTurnRate) - 5.0f) / 40.0f, 0.0f, 1.0f) : 0;
+			fTarget = cMath::Max(fMove, fTurn);
+		}
+		// Debug: HPL_VR_VIGNETTE_TEST=1 shows the full vignette all the time (for captures)
+		static bool bVignetteTest = EnvFlag("HPL_VR_VIGNETTE_TEST");
+		if(bVignetteTest && mbVignette) fTarget = 1;
+		if(fTarget > mfVignetteAmount)
+			mfVignetteAmount = mfVignetteFadeIn > 0 ? cMath::Min(fTarget, mfVignetteAmount + fDt / mfVignetteFadeIn) : fTarget;
+		else
+			mfVignetteAmount = mfVignetteFadeOut > 0 ? cMath::Max(fTarget, mfVignetteAmount - fDt / mfVignetteFadeOut) : fTarget;
+		if(mfVignetteAmount < 0.005f) return;
+
+		////////////////////////////
+		// Ring around the eye's forward axis, in tangent space (the eye's frustum): clear inside fInner degrees,
+		// black beyond fInner + feather. Off: the ring sits outside the image's corners.
+		const float fFeather = 20.0f;
+		float fFull = 50.0f - 30.0f * mfVignetteStrength;
+		float fInner = 75.0f + (fFull - 75.0f) * mfVignetteAmount;
+		const int kSegments = 64, kRings = 8;
+		float vRadius[kRings+2];
+		float vAlpha[kRings+2];
+		for(int r=0; r<=kRings; ++r)
+		{
+			float fT = (float)r / (float)kRings;
+			float fAngle = cMath::Min(fInner + fFeather * fT, 88.0f);
+			vRadius[r] = tan(cMath::ToRad(fAngle));
+			vAlpha[r] = fT*fT*(3.0f - 2.0f*fT); // smoothstep
+		}
+		vRadius[kRings+1] = 1000.0f;
+		vAlpha[kRings+1] = 1.0f;
+
+		GLint lPrevFbo = 0, lPrevProgram = 0;
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &lPrevFbo);
+		glGetIntegerv(GL_CURRENT_PROGRAM, &lPrevProgram);
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glUseProgram(0);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_SCISSOR_TEST);
+		glDisable(GL_ALPHA_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_LIGHTING);
+		glDisable(GL_VERTEX_PROGRAM_ARB);
+		glDisable(GL_FRAGMENT_PROGRAM_ARB);
+		glActiveTexture(GL_TEXTURE0);
+		glDisable(GL_TEXTURE_2D);
+		glDisable(GL_TEXTURE_RECTANGLE_ARB);
+		glDepthMask(GL_FALSE);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glMatrixMode(GL_TEXTURE);    glPushMatrix(); glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+		glMatrixMode(GL_PROJECTION); glPushMatrix();
+
+		for(int i=0; i<eVREye_LastEnum; ++i)
+		{
+			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, mvEyeFramebuffer[i]);
+			glViewport(0, 0, mvRenderSize.x, mvRenderSize.y);
+			glLoadIdentity();
+			glOrtho(mvEyeTan[i][0], mvEyeTan[i][1], mvEyeTan[i][2], mvEyeTan[i][3], -1, 1);
+			for(int r=0; r<=kRings; ++r)
+			{
+				glBegin(GL_TRIANGLE_STRIP);
+				for(int s=0; s<=kSegments; ++s)
+				{
+					float fA = k2Pif * (float)s / (float)kSegments;
+					float fC = cos(fA), fS = sin(fA);
+					glColor4f(0, 0, 0, vAlpha[r]);
+					glVertex2f(fC * vRadius[r], fS * vRadius[r]);
+					glColor4f(0, 0, 0, vAlpha[r+1]);
+					glVertex2f(fC * vRadius[r+1], fS * vRadius[r+1]);
+				}
+				glEnd();
+			}
+		}
+
+		glMatrixMode(GL_PROJECTION); glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+		glMatrixMode(GL_TEXTURE);    glPopMatrix();
+		glPopAttrib();
+		glUseProgram(lPrevProgram);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, lPrevFbo);
+	}
+
+	//-----------------------------------------------------------------------
+
 	void cVRSystem::Submit()
 	{
 		if(mbActive==false) return;
 #ifdef HPL_VR
+		DrawVignette();
 		for(int i=0; i<eVREye_LastEnum; ++i)
 		{
 			vr::Texture_t tex = { (void*)(uintptr_t)mvEyeTexture[i], vr::TextureType_OpenGL, vr::ColorSpace_Gamma };

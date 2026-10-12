@@ -1807,6 +1807,9 @@ void cLuxPlayer::UpdateVRHead(float afTimeStep)
 	if(pVR->IsActive()==false) return;
 	pVR->SetPlayerCamera(mpCamera);
 
+	// Comfort vignette: speed of the last physics step (room-scale shifts move both positions, so they don't count)
+	pVR->SetComfortMoveSpeed(mpCharBody->GetVelocity(afTimeStep).Length());
+
 	////////////////////////
 	// Yaw: apply the change since the last step (yaw limits of e.g. ladders may hold some of it back)
 	float fConsumed = pVR->GetConsumedHeadYaw();

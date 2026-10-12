@@ -1,7 +1,7 @@
 Amnesia: A Machine for Pigs VR
 ==============================
 
-A virtual reality version of Amnesia: A Machine for Pigs for SteamVR (made and tested with a Valve Index):
+A virtual reality version of Amnesia: A Machine for Pigs for SteamVR (tested with a Valve Index and an Oculus Quest 2):
 stereo 3D, head tracking, room-scale, and motion controls with hands.
 
 This folder contains no game files. You need your own copy of the game.
@@ -15,7 +15,7 @@ Requirements
 ------------
 - Windows 10 or 11
 - SteamVR and a headset
-- Amnesia: A Machine for Pigs installed (tested with the Epic Games version; other versions are likely to work)
+- Amnesia: A Machine for Pigs installed (tested with the Epic Games and Steam versions; other versions are likely to work)
 - The Visual C++ 2005 x86 runtime, which the game itself also needs (normally already installed with the game)
 
 
