@@ -338,6 +338,7 @@ private:
 	void UpdateVRHead(float afTimeStep);
 	void UpdateVRRoomScale(float afBodyYaw);
 	void UpdateVRCrouch();
+	void UpdateVRBodyTrail();
 	void UpdateVRSecondGrab(float afTimeStep);
 
 	void CreateCharacterBody(iPhysicsWorld *apPhysicsWorld);

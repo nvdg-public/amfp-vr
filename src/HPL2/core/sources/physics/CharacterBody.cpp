@@ -296,6 +296,7 @@ namespace hpl {
 		
 		mbActive = true;
 		mbCollideCharacter = true;
+		mfStaticCollisionWidth = 0;
 		mbTestCollision = true;
 		mbCollideStaticVolatile = true;
 
@@ -418,6 +419,7 @@ namespace hpl {
 		DisconnectBody();
 
 		for(size_t i=0; i< mvBodies.size(); i++) mpWorld->DestroyBody(mvBodies[i]);
+		for(size_t i=0; i< mvStaticShapes.size(); i++) if(mvStaticShapes[i]) mpWorld->DestroyShape(mvStaticShapes[i]);
 
 		hplDelete(mpCollideGravityCallback);
 		hplDelete(mpCollidePushCallback);
@@ -513,8 +515,26 @@ namespace hpl {
 		
 		mvBodies.push_back(pBody);
 		mvShapes.push_back(pCollider);
+		mvStaticShapes.push_back(NULL);
+		if(mfStaticCollisionWidth > 0) SetStaticCollisionWidth(mfStaticCollisionWidth);
 
 		return (int)mvShapes.size() -1;
+	}
+
+	//-----------------------------------------------------------------------
+
+	void iCharacterBody::SetStaticCollisionWidth(float afWidth)
+	{
+		mfStaticCollisionWidth = afWidth;
+		mvStaticShapes.resize(mvShapes.size(), NULL);
+		cMatrixf mtxOffset = cMath::MatrixRotateZ(kPi2f);
+		for(size_t i=0; i<mvShapes.size(); ++i)
+		{
+			if(mvStaticShapes[i]) { mpWorld->DestroyShape(mvStaticShapes[i]); mvStaticShapes[i] = NULL; }
+			float fRadius = afWidth * 0.5f;
+			if(afWidth > 0 && fRadius > mvShapes[i]->GetRadius())
+				mvStaticShapes[i] = mpWorld->CreateCylinderShape(fRadius, mvShapes[i]->GetHeight(), &mtxOffset);
+		}
 	}
 	
 	//-----------------------------------------------------------------------
@@ -1639,8 +1659,10 @@ namespace hpl {
 		if(mfCheckStepClimbCount > 0) return;
 		if(avPosAdd.SqrLength() < kEpsilonf) return;
 		
-		//Send a ray in front of the player.
+		//Send a ray in front of the player. With a wider shape for static geometry, that is what meets the step first.
 		float fRadius = mpCurrentShape->GetRadius();
+		if(mlCurrentShapeIdx < (int)mvStaticShapes.size() && mvStaticShapes[mlCurrentShapeIdx])
+			fRadius = cMath::Max(fRadius, mvStaticShapes[mlCurrentShapeIdx]->GetRadius());
 		float fPosAddLength = avPosAdd.Length();
 		float fForwadAdd = cMath::Max(fPosAddLength, 0.05f);
 		
@@ -2288,11 +2310,32 @@ namespace hpl {
 	{
 		if(alShapeIdx <0) alShapeIdx = mlCurrentShapeIdx;
 		iCollideShape *pShape = mvShapes[alShapeIdx];
+		iCollideShape *pStaticShape = alShapeIdx < (int)mvStaticShapes.size() ? mvStaticShapes[alShapeIdx] : NULL;
 
-		return mpWorld->CheckShapeWorldCollision(apPushBackVector, pShape, cMath::MatrixTranslate(avPos),
+		if(pStaticShape == NULL)
+		{
+			return mpWorld->CheckShapeWorldCollision(apPushBackVector, pShape, cMath::MatrixTranslate(avPos),
+													mpCurrentBody, false, true, 
+													apCallback, true,mlMinBodyPushStrength, 
+													mlCollideFlags, false, !mbCollideStaticVolatile);
+		}
+
+		//Wider shape for static geometry, the body's own for the rest. Push-backs combined per axis (largest wins).
+		cVector3f vPushStatic(0), vPushOther(0);
+		bool bStatic = mpWorld->CheckShapeWorldCollision(apPushBackVector ? &vPushStatic : NULL, pStaticShape, cMath::MatrixTranslate(avPos),
 												mpCurrentBody, false, true, 
 												apCallback, true,mlMinBodyPushStrength, 
+												mlCollideFlags, false, !mbCollideStaticVolatile, true);
+		bool bOther = mpWorld->CheckShapeWorldCollision(apPushBackVector ? &vPushOther : NULL, pShape, cMath::MatrixTranslate(avPos),
+												mpCurrentBody, true, true, 
+												apCallback, true,mlMinBodyPushStrength, 
 												mlCollideFlags, false, !mbCollideStaticVolatile);
+		if(apPushBackVector)
+		{
+			for(int i=0; i<3; ++i)
+				(*apPushBackVector).v[i] = std::abs(vPushStatic.v[i]) >= std::abs(vPushOther.v[i]) ? vPushStatic.v[i] : vPushOther.v[i];
+		}
+		return bStatic || bOther;
 	}
 	
 	//-----------------------------------------------------------------------

@@ -399,12 +399,67 @@ void cLuxPlayer::OnStart()
 
 //-----------------------------------------------------------------------
 
+// VR: the body's last 64 steps, written to the log when you leave the map (to see how you got out)
+struct cLuxVRBodyTrailStep { cVector3f mvPos, mvVel; bool mbOnGround; };
+static cLuxVRBodyTrailStep gvVRBodyTrail[64];
+static int glVRBodyTrailCount = 0;
+static bool gbVRFallLogged = false;
+
+static void LogVRBodyTrail(int alStride)
+{
+	for(int i = cMath::Max(glVRBodyTrailCount - 64, 0); i < glVRBodyTrailCount; i += alStride)
+	{
+		const cLuxVRBodyTrailStep &step = gvVRBodyTrail[i % 64];
+		Log("  trail %d: feet (%.2f %.2f %.2f) force vel (%.2f %.2f %.2f) %s\n", i - glVRBodyTrailCount, step.mvPos.x, step.mvPos.y,
+			step.mvPos.z, step.mvVel.x, step.mvVel.y, step.mvVel.z, step.mbOnGround ? "ground" : "air");
+	}
+}
+
 void cLuxPlayer::Update(float afTimeStep)
 {
 	mfTimeSinceLastVomit += afTimeStep;
 
 	////////////////////////
+	// Debug (HPL_VR_TEST_WALK="x y z"): 3 s after each spawn the feet are put at x y z, then the player keeps
+	// walking forward while turning in bursts (left, right, left, ...), bumping into walls and corners like a
+	// player with the stick held forward. Logs the position every 2 s; an escape shows as an out-of-map kill.
+	{
+		static const char *pTestWalk = getenv("HPL_VR_TEST_WALK");
+		static float fWalkTime = 0, fWalkNextLog = 0;
+		static bool bWalkPlaced = false;
+		if(pTestWalk && gpBase->mpMapHandler->GetCurrentMap())
+		{
+			if(IsDead()) { fWalkTime = 0; bWalkPlaced = false; }
+			else
+			{
+				fWalkTime += afTimeStep;
+				if(bWalkPlaced==false && fWalkTime > 3.0f)
+				{
+					cVector3f vFeet = 0;
+					sscanf(pTestWalk, "%f %f %f", &vFeet.x, &vFeet.y, &vFeet.z);
+					mpCharBody->SetFeetPosition(vFeet);
+					bWalkPlaced = true;
+					fWalkNextLog = fWalkTime + 2.0f;
+					Log("VR test: walk test from %s\n", vFeet.ToString().c_str());
+				}
+				else if(bWalkPlaced)
+				{
+					int lBurst = (int)(fWalkTime / 1.7f);
+					if(fmod(fWalkTime, 1.7f) < 0.6f) mpCamera->AddYaw(afTimeStep * ((lBurst % 3)==1 ? -2.5f : 2.0f));
+					mpCharBody->Move(eCharDir_Forward, 1.0f);
+					if(fWalkTime > fWalkNextLog)
+					{
+						fWalkNextLog = fWalkTime + 2.0f;
+						Log("VR test: walking at %s\n", mpCharBody->GetFeetPosition().ToString().c_str());
+					}
+				}
+			}
+		}
+	}
+
+	////////////////////////
 	// VR: the camera follows the head (before anything aims with it)
+	UpdateVRBodyTrail();
 	UpdateVRHead(afTimeStep);
 
 	////////////////////////
@@ -501,6 +556,7 @@ void cLuxPlayer::Update(float afTimeStep)
 		{
 			Log("VR: player out of the map at (%.1f %.1f %.1f), map (%.1f %.1f %.1f)-(%.1f %.1f %.1f): killed\n",
 				vPos.x, vPos.y, vPos.z, vMin.x, vMin.y, vMin.z, vMax.x, vMax.y, vMax.z);
+			LogVRBodyTrail(2);
 			SetHealth(0);
 		}
 	}
@@ -1729,6 +1785,10 @@ void cLuxPlayer::CreateCharacterBody(iPhysicsWorld *apPhysicsWorld)
 
 	//Create crouch extra
 	mpCharBody->AddExtraSize(mvBodyCrouchSize);
+	// VR: the thin body (Body CollisionWidth) for props, doors and enemies, the flat game's width for the level's
+	// static geometry (Body WallWidth), so it can't squeeze into gaps the levels were built to keep closed
+	if(cLuxVRSettings::Get().mbActive && cLuxVRSettings::Get().mfWallWidth > cLuxVRSettings::Get().mfBodyWidth)
+		mpCharBody->SetStaticCollisionWidth(cLuxVRSettings::Get().mfWallWidth);
 
 	//temp placement!
 	mpCharBody->SetFeetPosition(cVector3f(8.5f, 5.2f, 9.25f));
@@ -1873,6 +1933,30 @@ void cLuxPlayer::UpdateVRRoomScale(float afBodyYaw)
 			pVR->SetHeadAnchor(cVector3f(vAnchor.x + vLocalMoved.x, 0, vAnchor.z + vLocalMoved.z));
 			return;
 		}
+	}
+}
+
+//-----------------------------------------------------------------------
+
+/**
+ * VR: remembers the body's last 64 steps and writes them to the log when a fall over ~2 m starts (and when you
+ * leave the map), so it shows how you got somewhere you shouldn't be.
+ */
+void cLuxPlayer::UpdateVRBodyTrail()
+{
+	if(cLuxVRSettings::Get().mbActive==false) return;
+
+	cLuxVRBodyTrailStep &step = gvVRBodyTrail[glVRBodyTrailCount++ % 64];
+	step.mvPos = mpCharBody->GetFeetPosition();
+	step.mvVel = mpCharBody->GetForceVelocity();
+	step.mbOnGround = mpCharBody->IsOnGround();
+
+	if(step.mbOnGround) gbVRFallLogged = false;
+	else if(gbVRFallLogged==false && step.mvVel.y < -6.0f)
+	{
+		gbVRFallLogged = true;
+		Log("VR: falling at (%.2f %.2f %.2f), the last second:\n", step.mvPos.x, step.mvPos.y, step.mvPos.z);
+		LogVRBodyTrail(4);
 	}
 }
 

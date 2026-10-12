@@ -145,6 +145,9 @@ void cLuxPlayerHands::Reset()
 
 	mHandState = eLuxHandsState_Disabled;
 	mpVRHolsterObject = NULL;
+	// VR: the controller/hand models died with the old world (Reset runs instead of OnMapLeave when you quit to the menu)
+	mvVRControllerEntity[0] = mvVRControllerEntity[1] = NULL;
+	mvVRHandEntity[0] = mvVRHandEntity[1] = NULL;
 	mfHandObjectAlpha =0;
  
 	msCurrentAnim = "";

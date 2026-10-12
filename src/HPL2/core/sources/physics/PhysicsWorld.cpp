@@ -436,7 +436,7 @@ namespace hpl {
 							bool abCollideCharacter,
 							int alMinPushStrength,
 							tFlag alCollideFlags,
-							bool abDebug, bool abSkipStaticVolatile)
+							bool abDebug, bool abSkipStaticVolatile, bool abOnlyStatic)
 	{
 		cCollideData collideData;
 
@@ -465,6 +465,7 @@ namespace hpl {
 			if(pBody->IsCharacter() && abCollideCharacter==false) continue;
 			if(pBody == apSkipBody) continue;
 			if(abSkipStatic && pBody->GetMass()==0 && pBody->IsCharacter()==false) continue;
+			if(abOnlyStatic && (pBody->GetMass()!=0 || pBody->IsCharacter())) continue;
 			if(abIsCharacter && pBody->GetCollideCharacter()==false) continue;
 			if(abIsCharacter==false && pBody->GetCollide()==false) continue;
 			if(alMinPushStrength > pBody->GetPushStrength()) continue;
