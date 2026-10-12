@@ -116,6 +116,9 @@ namespace hpl {
 		void DisconnectBody();
 
 		int AddExtraSize(const cVector3f& avSize);
+		/** Collide with static (mass 0) level geometry as a wider cylinder than the body (0 = off): a thin body for
+		 * props, doors and characters that still can't squeeze into gaps the levels were built to keep closed. */
+		void SetStaticCollisionWidth(float afWidth);
 		void SetActiveSize(int alNum);
 		int GetActiveSize(){ return mlCurrentShapeIdx; }
 
@@ -545,6 +548,8 @@ namespace hpl {
 		iPhysicsBody *mpCurrentBody;
 		std::vector<iCollideShape*> mvShapes;
 		std::vector<iPhysicsBody*> mvBodies;
+		std::vector<iCollideShape*> mvStaticShapes;	// wider shapes for static geometry (NULL = use mvShapes)
+		float mfStaticCollisionWidth;
 
 		static std::vector<iPhysicsBody*> mvTempBodies;
 	};
