@@ -53,6 +53,15 @@ You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 11 MB). It conta
 
 **Without the installer**: copy the package folder anywhere (inside the game's folder is easiest) and start `aamfp_vr.exe` in it. It asks once where the game is installed if it isn't the parent folder, and does the DLL and animation steps itself on the first start. Always start `aamfp_vr.exe`, not `aamfp_vr_game.exe`.
 
+**Settings**: open `vr_settings.cfg` in the `VR` folder with any text editor. Every option is explained in it.
+
+**Without VR**: `aamfp_vr.exe -flat`.
+
+**Uninstall**: delete the `VR` folder (and the shortcut).
+
+
+## Button mappings
+
 **Buttons (Index controllers)**: left stick walk (click = run), right stick snap turn (click = recenter), right trigger use/click, right grip grab (let go mid-swing to throw), left grip at your left hip = lantern, left A journal, left B pause menu, right A crouch, right B jump.
 
 **Buttons (Quest 2/3)**: as on the Index, with X journal and Y pause menu. Finger curl comes from the touch sensors.
@@ -60,12 +69,6 @@ You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 11 MB). It conta
 **Buttons (Steam Frame)**: as on the Index, with left d-pad down = journal and View (or right Menu) = pause menu.
 
 **Buttons (Vive wands)**: left trackpad walk (click = run), right trackpad left/right turn; click the right trackpad up = jump, down = crouch, centre = recenter. Left menu button = pause menu, right menu button = journal. Trigger, grip and lantern as on the Index; the hands close with the grip and trigger.
-
-**Settings**: open `vr_settings.cfg` in the `VR` folder with any text editor. Every option is explained in it.
-
-**Without VR**: `aamfp_vr.exe -flat`.
-
-**Uninstall**: delete the `VR` folder (and the shortcut).
 
 ---
 
@@ -98,12 +101,6 @@ For development, `run\` holds the working copy of the exe and its files, and `ru
 | `src\tools\` | `fbx2anm` (animation converter), `hands` (hand model converter), `package` (package and install scripts) |
 | `run\` | Development run folder: exe, DLLs, `vr_settings.cfg`, SteamVR input files, test launchers |
 | `assets_src\` | Source of the hand models |
-
-## Status and open points
-- Phases 0 to 6a are done and confirmed in the headset: stereo and head tracking, room-scale and comfort, VR menus, motion controls, hand models, the portable package.
-- Tested with the Epic and Steam copies of the game, with the Valve Index and the Oculus Quest 2. Not tested yet: Vive wands and Steam Frame controllers (their bindings are untested defaults).
-- Optional: a 64-bit build.
-- Sharing: the source is public (GPLv3); the package is a zip with `install.bat`. It ships no game files or game DLLs.
 
 ## Credits and licence
 - Game and engine code: © Frictional Games, released under the **GNU GPL v3** ([FrictionalGames/AmnesiaAMachineForPigs](https://github.com/FrictionalGames/AmnesiaAMachineForPigs)). This VR version is GPLv3 as well.
