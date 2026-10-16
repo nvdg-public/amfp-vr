@@ -16,7 +16,6 @@ Requirements
 - Windows 10 or 11
 - SteamVR and a headset
 - Amnesia: A Machine for Pigs installed (tested with the Epic Games and Steam versions; other versions are likely to work)
-- The Visual C++ 2005 x86 runtime, which the game itself also needs (normally already installed with the game)
 
 
 Installing

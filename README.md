@@ -27,7 +27,6 @@ Saves and settings are shared with the normal game (`Documents\Amnesia\Pig`). Th
 | **The latest NVIDIA or AMD graphics driver** | The game needs proper OpenGL support. Restart after installing. |
 | **Steam + SteamVR** and a **SteamVR headset** | A free Steam account is enough. Install SteamVR from Steam (Library > Tools) and finish its room setup. Tested with the **Valve Index** and the **Oculus Quest 2**. |
 | **Your own copy of Amnesia: A Machine for Pigs** | **Epic Games Store** and **Steam** (app 239200): tested. Other stores: not tested. Start the normal game once to check it works. |
-| **Visual C++ 2005 SP1 Redistributable (x86)** | Needed by the game's own `DevIL.dll` (the Epic install only brings the 2010 one). Get **"Microsoft Visual C++ 2005 Service Pack 1 Redistributable Package MFC Security Update"**, `vcredist_x86.exe`, from microsoft.com. Without it the game won't start (missing MSVCR80.dll / side-by-side error). |
 
 Not needed: the newer Visual C++ 2015-2026 runtime (the package contains `msvcp140.dll` and `vcruntime140.dll`), and the converted animations (they are made from your game files during installation or on the first start).
 
