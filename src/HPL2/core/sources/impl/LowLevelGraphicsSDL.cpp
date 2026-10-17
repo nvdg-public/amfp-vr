@@ -1126,6 +1126,7 @@ namespace hpl {
 
 		if(cVRSystem::Get()->IsActive())
 		{
+			cVRSystem::Get()->EndMirrorSwap();
 			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, gHplScreenFramebuffer);
 		}
 	}

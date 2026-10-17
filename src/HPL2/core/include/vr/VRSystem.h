@@ -209,6 +209,12 @@ namespace hpl {
 		/** Number of recenters so far (the game resets its head state when this changes). */
 		int GetRecenterCount() const { return mlRecenterCount; }
 
+		//// Diagnostics (vr_settings.cfg Diagnostics Log) ////////////////
+		/** The camera position add the game gives the character body (scripted head moves, shakes), for the log. */
+		void SetDiagHeadPosAdd(const cVector3f& avAdd){ mvDiagHeadPosAdd = avAdd; }
+		/** Called right after the desktop mirror window's buffer swap (BlitMirror marks the start). */
+		void EndMirrorSwap();
+
 		//// Controllers (Phase 5) /////////////////////////////////////////////
 		/** True when SteamVR Input is set up (action manifest loaded). Buttons/sticks/poses are only valid then. */
 		bool HasControllerInput() const { return mbInputActive; }
@@ -384,6 +390,22 @@ namespace hpl {
 		double mfWaitEnd, mfLastSubmit;
 		double mfIntervalSum, mfRenderSum, mfWaitSum;
 		int mlTimingFrames;
+
+		// Diagnostics: headset/runtime info at start (always), head/body/timing lines while Diagnostics Log is on
+		void LogDeviceInfo();
+		void LogSeatedZero(const char *asWhen);
+		void LogDiagnostics();
+		bool mbDiagLog;
+		double mfDiagStartTime, mfDiagLastTime;
+		int mlDiagPoses, mlDiagInvalidPoses, mlDiagTrackingResult;
+		float mfDiagLastHeadYaw, mfDiagLastBodyYaw;
+		cVector3f mvDiagHeadPosAdd;
+		double mfMirrorSwapStart, mfMirrorSwapSum, mfMirrorSwapMax;
+		double mfDiagIntervalSum, mfDiagIntervalMax, mfDiagLastWaitEnd;
+		int mlDiagFrames;
+		unsigned int mlDiagLastPresented, mlDiagLastDropped, mlDiagLastReprojected;
+		double mfHighHeadSince;
+		bool mbHighHeadWarned;
 	};
 
 	//------------------------------------------------------------

@@ -1492,6 +1492,7 @@ void cLuxPlayer::UpdateHeadPosAdd(float afTimeStep)
 		cVector3f vLocal = mvHeadPosAddSum;
 		cVector3f vTurned = cMath::MatrixMul(cMath::MatrixRotateY(-cVRSystem::Get()->GetConsumedHeadYaw()), cVector3f(vLocal.x, 0, -vLocal.z));
 		vAdd = mvCameraPosAdd + cVector3f(vTurned.x, vLocal.y, -vTurned.z);
+		cVRSystem::Get()->SetDiagHeadPosAdd(vAdd);
 	}
 
 

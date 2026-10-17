@@ -179,6 +179,19 @@ namespace hpl {
 		mfWaitEnd = mfLastSubmit = 0;
 		mfIntervalSum = mfRenderSum = mfWaitSum = 0;
 		mlTimingFrames = 0;
+
+		mbDiagLog = true;
+		mfDiagStartTime = mfDiagLastTime = 0;
+		mlDiagPoses = mlDiagInvalidPoses = 0;
+		mlDiagTrackingResult = 0;
+		mfDiagLastHeadYaw = mfDiagLastBodyYaw = 0;
+		mvDiagHeadPosAdd = 0;
+		mfMirrorSwapStart = mfMirrorSwapSum = mfMirrorSwapMax = 0;
+		mfDiagIntervalSum = mfDiagIntervalMax = mfDiagLastWaitEnd = 0;
+		mlDiagFrames = 0;
+		mlDiagLastPresented = mlDiagLastDropped = mlDiagLastReprojected = 0;
+		mfHighHeadSince = 0;
+		mbHighHeadWarned = false;
 	}
 
 	//-----------------------------------------------------------------------
@@ -356,6 +369,7 @@ namespace hpl {
 			Log(" Note: vr_settings.cfg asks for %d Hz but the headset runs at %.0f Hz. Change it in SteamVR > Settings > Video.\n",
 				mlRefreshRateHint, fRefresh);
 		}
+		LogDeviceInfo();
 
 		mbActive = true;
 		return true;
@@ -536,6 +550,7 @@ namespace hpl {
 		mfVignetteStrength = cMath::Clamp(cfg.GetFloat("Vignette", "Strength", 0.5f), 0.0f, 1.0f);
 		mfVignetteFadeIn = cMath::Clamp(cfg.GetFloat("Vignette", "FadeIn", 0.15f), 0.0f, 3.0f);
 		mfVignetteFadeOut = cMath::Clamp(cfg.GetFloat("Vignette", "FadeOut", 0.4f), 0.0f, 3.0f);
+		mbDiagLog = cfg.GetBool("Diagnostics", "Log", true);
 
 		////////////////////////////////
 		// Environment overrides (for tests and quick experiments)
@@ -900,6 +915,9 @@ namespace hpl {
 		const vr::TrackedDevicePose_t &hmd = gvPoses[vr::k_unTrackedDeviceIndex_Hmd];
 		mbHasPose = hmd.bPoseIsValid;
 		if(mbHasPose) m_mtxHead = ToMatrix(hmd.mDeviceToAbsoluteTracking);
+		++mlDiagPoses;
+		if(mbHasPose==false) ++mlDiagInvalidPoses;
+		mlDiagTrackingResult = (int)hmd.eTrackingResult;
 
 		// Debug: HPL_VR_FIXED_POSE=1 ignores head tracking (identity head pose), for reproducible captures
 		static bool bFixedPose = EnvFlag("HPL_VR_FIXED_POSE");
@@ -925,6 +943,7 @@ namespace hpl {
 		if(mpPreRenderCallback) mpPreRenderCallback(mpPreRenderUserData);
 
 		if(mlFrameCount == 0) Log("VR: first poses received (HMD pose valid: %d)\n", mbHasPose ? 1 : 0);
+		LogDiagnostics();
 #endif
 	}
 
@@ -1094,6 +1113,7 @@ namespace hpl {
 	void cVRSystem::BlitMirror(const cVector2l& avWindowSize)
 	{
 		if(mbActive==false) return;
+		mfMirrorSwapStart = SecondsNow();	// EndMirrorSwap after the window's buffer swap
 		if(mbMirrorEnabled==false)
 		{
 			glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
@@ -1131,11 +1151,167 @@ namespace hpl {
 	{
 		if(mbActive==false) return;
 #ifdef HPL_VR
+		cVector3f vHead = m_mtxHead.GetTranslation();
 		if(vr::VRChaperone()) vr::VRChaperone()->ResetZeroPose(vr::TrackingUniverseSeated);
 		mvHeadAnchor = 0;
 		++mlRecenterCount;
 		mbPlacePanelOnNextPose = true;
-		Log("VR: recentered\n");
+		mbHighHeadWarned = false;
+		Log("VR: recentered (head was at %.2f %.2f %.2f m in seated space)\n", vHead.x, vHead.y, vHead.z);
+#endif
+	}
+
+	//-----------------------------------------------------------------------
+
+	/**
+	 * Diagnostics for headset-specific problems: which headset and runtime, the eye transforms and field of view, and
+	 * where SteamVR's seated zero (what recentering sets) is. Logged once at start, whatever Diagnostics Log says.
+	 */
+	void cVRSystem::LogDeviceInfo()
+	{
+#ifdef HPL_VR
+		char sBuf[1024] = "";
+		uint32_t lRequired = 0;
+		if(vr::VR_GetRuntimePath(sBuf, sizeof(sBuf), &lRequired)) Log(" VR runtime: %s\n", sBuf);
+		else Log(" VR runtime: unknown\n");
+	#ifdef WIN32
+		HMODULE hApi = GetModuleHandleA("openvr_api.dll");
+		if(hApi && GetModuleFileNameA(hApi, sBuf, sizeof(sBuf)) > 0) Log(" VR api: %s\n", sBuf);
+	#endif
+
+		vr::ETrackedDeviceProperty vProps[4] = { vr::Prop_TrackingSystemName_String, vr::Prop_ManufacturerName_String,
+												 vr::Prop_ModelNumber_String, vr::Prop_DriverVersion_String };
+		char vValues[4][256];
+		for(int i=0; i<4; ++i)
+		{
+			vValues[i][0] = 0;
+			gpHmd->GetStringTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vProps[i], vValues[i], sizeof(vValues[i]));
+		}
+		Log(" Headset: tracking system '%s', manufacturer '%s', model '%s', driver version '%s'\n",
+			vValues[0], vValues[1], vValues[2], vValues[3]);
+		float fIpd = gpHmd->GetFloatTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_UserIpdMeters_Float);
+		float fPhotons = gpHmd->GetFloatTrackedDeviceProperty(vr::k_unTrackedDeviceIndex_Hmd, vr::Prop_SecondsFromVsyncToPhotons_Float);
+		Log(" Headset: IPD %.1f mm, vsync to photons %.1f ms\n", fIpd*1000, fPhotons*1000);
+
+		for(int i=0; i<eVREye_LastEnum; ++i)
+		{
+			float vRaw[4];
+			gpHmd->GetProjectionRaw(i==0 ? vr::Eye_Left : vr::Eye_Right, &vRaw[0], &vRaw[1], &vRaw[2], &vRaw[3]);
+			const cMatrixf &m = m_mtxEyeToHead[i];
+			cVector3f vPos = m.GetTranslation() * 1000.0f;
+			float fTurn = cMath::ToDeg(acos(cMath::Clamp(m.m[2][2], -1.0f, 1.0f)));
+			Log(" Eye %d: %.1f %.1f %.1f mm from the head, turned %.2f deg (yaw %.2f), FOV left %.1f right %.1f up %.1f down %.1f deg\n",
+				i, vPos.x, vPos.y, vPos.z, fTurn, cMath::ToDeg(atan2(m.m[0][2], m.m[2][2])),
+				cMath::ToDeg(atan(-vRaw[0])), cMath::ToDeg(atan(vRaw[1])), cMath::ToDeg(atan(-vRaw[2])), cMath::ToDeg(atan(vRaw[3])));
+		}
+		Log(" Eye distance from the eye transforms: %.1f mm\n",
+			cMath::Vector3Dist(m_mtxEyeToHead[0].GetTranslation(), m_mtxEyeToHead[1].GetTranslation()) * 1000.0f);
+
+		LogSeatedZero("at start");
+		Log(" VR diagnostics log: %s\n", mbDiagLog ? "on (vr_settings.cfg Diagnostics Log)" : "off");
+#endif
+	}
+
+	void cVRSystem::LogSeatedZero(const char *asWhen)
+	{
+#ifdef HPL_VR
+		cMatrixf mtx = ToMatrix(gpHmd->GetSeatedZeroPoseToStandingAbsoluteTrackingPose());
+		cVector3f vPos = mtx.GetTranslation();
+		Log("VR: seated zero %s: %.2f m above the standing floor, %.2f %.2f m from the play area centre, yaw %.0f deg\n",
+			asWhen, vPos.y, vPos.x, vPos.z, cMath::ToDeg(atan2(mtx.m[0][2], mtx.m[2][2])));
+#endif
+	}
+
+	void cVRSystem::EndMirrorSwap()
+	{
+		if(mfMirrorSwapStart <= 0) return;
+		double fTime = SecondsNow() - mfMirrorSwapStart;
+		mfMirrorSwapStart = 0;
+		mfMirrorSwapSum += fTime;
+		if(fTime > mfMirrorSwapMax) mfMirrorSwapMax = fTime;
+	}
+
+	/**
+	 * Called every frame after WaitGetPoses. Warns once when the head is far above the recentered height (the view
+	 * height is then held at MaxHeadRise, so vertical head movement is lost), and with Diagnostics Log on writes a
+	 * line every 2 s for the first 2 minutes, then every 30 s: head pose, body yaw (should only change when you turn
+	 * with the stick/mouse, never when you just look around), scripted head offset, pose validity and frame timing.
+	 */
+	void cVRSystem::LogDiagnostics()
+	{
+#ifdef HPL_VR
+		double fNow = SecondsNow();
+		cVector3f vHead = m_mtxHead.GetTranslation();
+
+		if(mbHasPose && vHead.y > mfHeadMaxUp + 0.25f)
+		{
+			if(mfHighHeadSince == 0) mfHighHeadSince = fNow;
+			else if(mbHighHeadWarned==false && fNow - mfHighHeadSince > 1.0)
+			{
+				mbHighHeadWarned = true;
+				Log("VR: the head is %.2f m above the recentered height, so the view height is held at MaxHeadRise (%.2f m) "
+					"and looking up/down or leaning doesn't move the view vertically. Recenter (F9 or right stick click).\n",
+					vHead.y, mfHeadMaxUp);
+				LogSeatedZero("now");
+			}
+		}
+		else mfHighHeadSince = 0;
+
+		if(mbDiagLog==false) return;
+
+		++mlDiagFrames;
+		if(mfDiagLastWaitEnd > 0)
+		{
+			double fInterval = mfWaitEnd - mfDiagLastWaitEnd;
+			mfDiagIntervalSum += fInterval;
+			if(fInterval > mfDiagIntervalMax) mfDiagIntervalMax = fInterval;
+		}
+		mfDiagLastWaitEnd = mfWaitEnd;
+
+		vr::Compositor_CumulativeStats stats;
+		if(mfDiagStartTime == 0)
+		{
+			mfDiagStartTime = mfDiagLastTime = fNow;
+			mfDiagLastHeadYaw = GetHeadYaw();
+			mfDiagLastBodyYaw = mfRenderBodyYaw;
+			vr::VRCompositor()->GetCumulativeStats(&stats, sizeof(stats));
+			mlDiagLastPresented = stats.m_nNumFramePresents;
+			mlDiagLastDropped = stats.m_nNumDroppedFrames;
+			mlDiagLastReprojected = stats.m_nNumReprojectedFrames;
+			return;
+		}
+		if(fNow - mfDiagLastTime < (fNow - mfDiagStartTime < 120 ? 2.0 : 30.0)) return;
+		mfDiagLastTime = fNow;
+
+		vr::VRCompositor()->GetCumulativeStats(&stats, sizeof(stats));
+		cMatrixf mtxZero = ToMatrix(gpHmd->GetSeatedZeroPoseToStandingAbsoluteTrackingPose());
+		float fHeadYaw = GetHeadYaw();
+		float fN = (float)(mlDiagFrames > 0 ? mlDiagFrames : 1);
+
+		Log("VR diag: %.0f s | head %.2f %.2f %.2f m%s, yaw %.0f pitch %.0f, turned %.0f | body yaw %.0f, turned %.0f, "
+			"head yaw held back %.1f | anchor %.2f %.2f, y add %.2f, head pos add %.2f %.2f %.2f | poses %d, invalid %d, tracking %d | "
+			"frames %d, interval avg %.2f max %.2f ms, mirror swap avg %.2f max %.2f ms | presented %u dropped %u reprojected %u | "
+			"seated zero %.2f m above floor\n",
+			fNow - mfDiagStartTime, vHead.x, vHead.y, vHead.z, vHead.y > mfHeadMaxUp ? " (height held)" : "",
+			cMath::ToDeg(fHeadYaw), cMath::ToDeg(GetHeadPitch()), cMath::ToDeg(cMath::GetAngleDistanceRad(mfDiagLastHeadYaw, fHeadYaw)),
+			cMath::ToDeg(mfRenderBodyYaw), cMath::ToDeg(cMath::GetAngleDistanceRad(mfDiagLastBodyYaw, mfRenderBodyYaw)),
+			cMath::ToDeg(cMath::GetAngleDistanceRad(mfConsumedHeadYaw, fHeadYaw)),
+			mvHeadAnchor.x, mvHeadAnchor.z, mfHeadYAdd, mvDiagHeadPosAdd.x, mvDiagHeadPosAdd.y, mvDiagHeadPosAdd.z,
+			mlDiagPoses, mlDiagInvalidPoses, mlDiagTrackingResult,
+			mlDiagFrames, (float)(mfDiagIntervalSum*1000/fN), (float)(mfDiagIntervalMax*1000),
+			(float)(mfMirrorSwapSum*1000/fN), (float)(mfMirrorSwapMax*1000),
+			stats.m_nNumFramePresents - mlDiagLastPresented, stats.m_nNumDroppedFrames - mlDiagLastDropped,
+			stats.m_nNumReprojectedFrames - mlDiagLastReprojected, mtxZero.GetTranslation().y);
+
+		mfDiagLastHeadYaw = fHeadYaw;
+		mfDiagLastBodyYaw = mfRenderBodyYaw;
+		mlDiagPoses = mlDiagInvalidPoses = 0;
+		mlDiagFrames = 0;
+		mfDiagIntervalSum = mfDiagIntervalMax = 0;
+		mfMirrorSwapSum = mfMirrorSwapMax = 0;
+		mlDiagLastPresented = stats.m_nNumFramePresents;
+		mlDiagLastDropped = stats.m_nNumDroppedFrames;
+		mlDiagLastReprojected = stats.m_nNumReprojectedFrames;
 #endif
 	}
 
