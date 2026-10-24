@@ -22,7 +22,7 @@ Installing
 ----------
 Easiest: double-click install.bat. It finds your Epic or Steam copy of the game (or asks where it is), copies
 these files into a VR folder inside the game's folder, prepares everything and puts an "Amnesia AMFP VR"
-shortcut on your desktop. Then start SteamVR and the shortcut. Running it again keeps your vr_settings.cfg.
+shortcut on your desktop. Then start SteamVR and the shortcut. Running it again keeps all your settings and adds new options to vr_settings.cfg.
 
 Without the installer: put this folder anywhere, for example inside the game's folder (then it finds the game by
 itself), and start aamfp_vr.exe. If the game is not found, you are asked once for the folder where the game is installed

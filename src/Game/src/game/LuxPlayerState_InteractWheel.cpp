@@ -26,6 +26,7 @@
 #include "LuxProp.h"
 #include "LuxMoveState_Normal.h"
 #include "LuxInputHandler.h"
+#include "LuxVR.h"
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS
@@ -97,6 +98,8 @@ void cLuxPlayerState_InteractWheel::RenderSolid(cRendererCallbackFunctions* apFu
 void cLuxPlayerState_InteractWheel::EnterRotateBase(eLuxPlayerState aPrevState)
 {
 	mlstMoveAdds.clear();
+	mbVRAngleValid = false;
+	mfVRAngleError = 0;
 }
 
 //-----------------------------------------------------------------------
@@ -187,6 +190,72 @@ float cLuxPlayerState_InteractWheel::GetSpeedAdd(cCamera *apCam)
 	float fLength = mvMouseAdd.Length();
 	
 	return fDirMul *fLength* 1.0f;
+}
+
+//-----------------------------------------------------------------------
+
+/**
+ * VR (Hands ValveFollowHand): the wheel follows the hand's angle around the wheel's axis. The grip position is
+ * projected onto the wheel's plane; each step's change of its angle there is added to how far the hand is ahead of
+ * the wheel, the wheel's own turning (along the pin) is taken off, and the wanted speed closes that gap. The gap is
+ * capped, so a wheel at its limit does not wind up. Closer than 5 cm to the axis the angle is too jittery: kept.
+ */
+bool cLuxPlayerState_InteractWheel::GetVRRotSpeed(float afTimeStep, float &afSpeed)
+{
+	const float kfDeadZone = 0.05f;
+	const float kfMaxError = cMath::ToRad(30.0f);
+	const float kfGain = 10.0f;		// 1/s: how fast the wheel catches up with the hand
+	const float kfMaxSpeed = cMath::ToRad(360.0f);
+
+	cVRSystem *pVR = cVRSystem::Get();
+	if(cLuxVRSettings::Get().mbValveFollowHand==false || pVR->IsActive()==false || pVR->UsesHandPointer()==false) return false;
+
+	afSpeed = 0;
+	eVRHand hand = pVR->GetPointerHand();
+	cMatrixf mtxGrip;
+	if(pVR->GetHandGripPose(hand, mtxGrip)==false)
+	{
+		mbVRAngleValid = false;
+		mfVRAngleError = 0;
+		return true;
+	}
+	if(mbVRAngleValid && mlVRHand != (int)hand) mbVRAngleValid = false;
+
+	cVector3f vPin = cMath::Vector3Normalize(mpCurrentJoint->GetPinDir());
+	cVector3f vHand = cMath::MatrixMul(pVR->GetSeatedToWorld(mpPlayer->GetCamera()), mtxGrip.GetTranslation());
+	cVector3f vRel = vHand - mpCurrentJoint->GetPivotPoint();
+	vRel -= vPin * cMath::Vector3Dot(vRel, vPin);
+
+	if(vRel.Length() > kfDeadZone)
+	{
+		if(mbVRAngleValid==false)
+		{
+			mvVRAxisU = cMath::Vector3Normalize(vRel);
+			mvVRAxisV = cMath::Vector3Cross(vPin, mvVRAxisU);
+			mfVRPrevAngle = 0;
+			mfVRAngleError = 0;
+			mlVRHand = (int)hand;
+			mbVRAngleValid = true;
+		}
+		else
+		{
+			// Counterclockwise around the pin, the same sense as a positive speed
+			float fAngle = atan2(cMath::Vector3Dot(vRel, mvVRAxisV), cMath::Vector3Dot(vRel, mvVRAxisU));
+			float fDelta = fAngle - mfVRPrevAngle;
+			while(fDelta > kPif) fDelta -= k2Pif;
+			while(fDelta < -kPif) fDelta += k2Pif;
+			mfVRPrevAngle = fAngle;
+			mfVRAngleError += fDelta;
+		}
+	}
+	if(mbVRAngleValid==false) return true;
+
+	float fWheelSpeed = cMath::Vector3Dot(vPin, mpCurrentBody->GetAngularVelocity());
+	mfVRAngleError -= fWheelSpeed * afTimeStep;
+	mfVRAngleError = cMath::Clamp(mfVRAngleError, -kfMaxError, kfMaxError);
+
+	afSpeed = cMath::Clamp(mfVRAngleError * kfGain, -kfMaxSpeed, kfMaxSpeed);
+	return true;
 }
 
 //-----------------------------------------------------------------------

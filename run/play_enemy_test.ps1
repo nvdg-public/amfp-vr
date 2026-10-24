@@ -56,8 +56,14 @@ try {
     $proc.WaitForExit()
 }
 finally {
-    # ---- restore main_settings.cfg exactly
-    Copy-Item $Backup $Main -Force
-    Remove-Item $Pending -ErrorAction SilentlyContinue
-    Write-Host "Restored $Main"
+    # ---- restore main_settings.cfg exactly, but only once the game has closed: it writes main_settings.cfg when
+    # it exits, which would put the test settings back (e.g. when this window is closed while the game runs).
+    # Then PENDING_RESTORE.txt stays and the next play*.bat / restore_settings.bat restores (restore_pending.ps1).
+    if ($proc -and -not $proc.HasExited) {
+        Write-Host "The game is still running: your settings are restored the next time you start a play*.bat."
+    } else {
+        Copy-Item $Backup $Main -Force
+        Remove-Item $Pending -ErrorAction SilentlyContinue
+        Write-Host "Restored $Main"
+    }
 }

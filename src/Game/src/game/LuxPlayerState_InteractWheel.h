@@ -61,11 +61,19 @@ protected:
 	void LeaveRotateBase(eLuxPlayerState aNewState);
 
 	float GetSpeedAdd(cCamera *apCam);
+	bool GetVRRotSpeed(float afTimeStep, float &afSpeed);
 	void OnThrow();
 
 	cLuxInteractData_Wheel *mpWheelData;
 
 	std::list<cVector2f> mlstMoveAdds;
+
+	// VR: hand angle around the wheel axis
+	bool mbVRAngleValid;
+	int mlVRHand;
+	cVector3f mvVRAxisU, mvVRAxisV;	// basis of the wheel plane
+	float mfVRPrevAngle;
+	float mfVRAngleError;	// radians the hand is ahead of the wheel
 };
 
 //----------------------------------------------

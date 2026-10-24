@@ -1,5 +1,6 @@
 # Amnesia: A Machine for Pigs VR - installer (started by install.bat in the package folder).
-# Finds the game (Epic or Steam, or asks), copies this package into <game>\VR (keeps an existing vr_settings.cfg),
+# Finds the game (Epic or Steam, or asks), copies this package into <game>\VR (an existing vr_settings.cfg is merged:
+# the new file with all its options and comments, filled in with every value from the old file),
 # copies the game's engine DLLs next to the VR exe, converts the animations the game ships only as FBX, and makes
 # a desktop shortcut. Never changes the game's own files. Uninstall: delete <game>\VR and the shortcut.
 param([string]$Game = '', [switch]$NoPause)
@@ -16,6 +17,50 @@ function Done([string]$msg, [int]$code) {
 
 function Test-GameDir([string]$dir) {
     $dir -and (Test-Path (Join-Path $dir 'resources.cfg')) -and (Test-Path (Join-Path $dir 'maps') -PathType Container)
+}
+
+function Merge-VrSettings([string]$oldFile, [string]$newFile) {
+    # Step 1: the new package's vr_settings.cfg is already in place, so the player sees every new option.
+    # Step 2: every value from the old file replaces the one in the new file. Old keys or sections the new
+    # file doesn't have are added (the game ignores keys it doesn't know). Comments are never touched.
+    $old = [IO.File]::ReadAllText($oldFile) -replace '(?s)<!--.*?-->', ''
+    $new = [IO.File]::ReadAllText($newFile)
+    $attrRx = '([A-Za-z_][\w.]*)\s*=\s*"([^"]*)"'
+    $oldVals = [ordered]@{}
+    foreach ($m in [regex]::Matches($old, '<([A-Za-z_]\w*)\b([^>]*?)/?>')) {
+        $sec = $m.Groups[1].Value
+        if (-not $oldVals.Contains($sec)) { $oldVals[$sec] = [ordered]@{} }
+        foreach ($a in [regex]::Matches($m.Groups[2].Value, $attrRx)) { $oldVals[$sec][$a.Groups[1].Value] = $a.Groups[2].Value }
+    }
+    $seen = @{}
+    $parts = [regex]::Split($new, '(<!--[\s\S]*?-->)')
+    for ($i = 0; $i -lt $parts.Count; $i++) {
+        if ($parts[$i].StartsWith('<!--')) { continue }
+        $parts[$i] = [regex]::Replace($parts[$i], '<([A-Za-z_]\w*)\b([^>]*?)(\s*/?>)', {
+            param($m)
+            $sec = $m.Groups[1].Value
+            if (-not $oldVals.Contains($sec)) { return $m.Value }
+            $seen[$sec] = $true
+            $vals = $oldVals[$sec]
+            $done = @{}
+            $body = [regex]::Replace($m.Groups[2].Value, $attrRx, {
+                param($a)
+                $k = $a.Groups[1].Value
+                $done[$k] = $true
+                if ($vals.Contains($k)) { $k + '="' + $vals[$k] + '"' } else { $a.Value }
+            })
+            foreach ($k in $vals.Keys) { if (-not $done.ContainsKey($k)) { $body += ' ' + $k + '="' + $vals[$k] + '"' } }
+            '<' + $sec + $body + $m.Groups[3].Value
+        })
+    }
+    $out = -join $parts
+    foreach ($sec in $oldVals.Keys) {
+        if ($seen.ContainsKey($sec)) { continue }
+        $body = ''
+        foreach ($k in $oldVals[$sec].Keys) { $body += ' ' + $k + '="' + $oldVals[$sec][$k] + '"' }
+        $out = $out.TrimEnd() + "`r`n`r`n<" + $sec + $body + " />`r`n"
+    }
+    [IO.File]::WriteAllText($newFile, $out, (New-Object Text.UTF8Encoding $false))
 }
 
 Write-Host $title
@@ -101,7 +146,18 @@ try {
         Get-ChildItem $dest -Force | Where-Object { $_.Name -ne 'data_overlay' } | ForEach-Object { Remove-Item $_.FullName -Recurse -Force }
         Get-ChildItem $pkg -Force | Where-Object { $_.Name -notin 'vr_package.cfg', 'data_overlay' } | Copy-Item -Destination $dest -Recurse -Force
         Set-Content (Join-Path $dest 'vr_package.cfg') "# Amnesia: A Machine for Pigs VR package. The game is the parent folder.`r`nGameFolder=" -Encoding ascii
-        if ($keep) { Move-Item $keep (Join-Path $dest 'vr_settings.cfg') -Force; Write-Host 'Kept your existing vr_settings.cfg.' }
+        if ($keep) {
+            $cfg = Join-Path $dest 'vr_settings.cfg'
+            try {
+                if (-not (Test-Path $cfg)) { throw 'no new vr_settings.cfg in the package' }
+                Merge-VrSettings $keep $cfg
+                Remove-Item $keep -Force
+                Write-Host 'Updated vr_settings.cfg with the new options and kept all your values.'
+            } catch {
+                Move-Item $keep $cfg -Force
+                Write-Host "Kept your existing vr_settings.cfg (could not add the new options: $($_.Exception.Message))."
+            }
+        }
         Write-Host "Copied the VR files to $dest"
     } else {
         Write-Host "The VR files are already in $dest"

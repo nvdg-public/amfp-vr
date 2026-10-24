@@ -45,7 +45,7 @@ You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 11 MB). It conta
    - copies the game's engine DLLs and converts 98 character animations from your game files (a few seconds);
    - puts an **Amnesia AMFP VR** shortcut on your desktop.
 
-   Running it again (for example after an update) keeps your `vr_settings.cfg`. You can delete the unzipped folder afterwards.
+   Running it again (for example after an update) keeps all your settings: you get the new `vr_settings.cfg` with any new options, filled in with every value from your old one. You can delete the unzipped folder afterwards.
 3. Start **SteamVR** and check that the headset and controllers are green.
 4. Start **Amnesia AMFP VR** from the desktop shortcut. Windows SmartScreen may warn because the exe isn't signed: *More info* > *Run anyway*.
 5. Put the headset on. **Recenter** with a right stick click (or F9) whenever you sit down or stand up.
@@ -61,13 +61,46 @@ You need the **VR package**: the `AmnesiaAMFP_VR` folder (about 11 MB). It conta
 
 ## Button mappings
 
-**Buttons (Index controllers)**: left stick walk (click = run), right stick snap turn (click = recenter), right trigger use/click, right grip grab (let go mid-swing to throw), left grip at your left hip = lantern, left A journal, left B pause menu, right A crouch, right B jump.
+**Buttons (Index controllers)**: left stick walk (click = run), right stick snap turn (click = recenter), right trigger use/click, right grip grab (let go mid-swing to throw), left grip at your left hip = lantern (see [Can't find the lantern?](#cant-find-the-lantern)), left A journal, left B pause menu, right A crouch, right B jump.
 
 **Buttons (Quest 2/3)**: as on the Index, with X journal and Y pause menu. Finger curl comes from the touch sensors.
 
 **Buttons (Steam Frame)**: as on the Index, with left d-pad down = journal and View (or right Menu) = pause menu.
 
 **Buttons (Vive wands)**: left trackpad walk (click = run), right trackpad left/right turn; click the right trackpad up = jump, down = crouch, centre = recenter. Left menu button = pause menu, right menu button = journal. Trigger, grip and lantern as on the Index; the hands close with the grip and trigger.
+
+## Can't find the lantern?
+
+The lantern has no button of its own: it hangs at your hip, and you have to reach for it. The spot is small, so it can be hard to find the first few times.
+
+**How to take out the lantern**
+1. Stand or sit up straight and look ahead.
+2. Move your left hand down to your left hip, slightly to the side and a little behind your body, where a holster would sit on your belt.
+3. When your hand is in the right spot, the controller gives a short buzz.
+4. Press the **left grip** there. The lantern is now in your hand. Aim the light by pointing your hand.
+5. To put it away, bring your hand back to the same spot until it buzzes and press the left grip again.
+
+The spot follows your head, so if you lean far forward or to the side, it moves with you. In left-handed mode (`LeftHanded="true"`) the lantern is in your right hand and the spot is at your right hip.
+
+**Making the spot bigger (`LanternHipRadius`)**
+
+`LanternHipRadius` sets how close your hand must be to the hip spot, in metres. The default is `0.25`. A larger value makes the lantern easier to find.
+
+1. Close the game.
+2. Open `vr_settings.cfg` in the `VR` folder inside the game's folder with a text editor (Notepad is fine).
+3. Search for `LanternHipRadius`. It is on the long line that starts with `<Hands`.
+4. Change the number between the quotes, for example from `LanternHipRadius="0.25"` to `LanternHipRadius="0.35"`. Only change the number and keep the quotes.
+5. Save the file and start the game again.
+
+Good values to try:
+
+| Value | Effect |
+|---|---|
+| `0.25` | Default. |
+| `0.35` | Easier to find. A good first step. |
+| `0.45` | Very easy, but then the left grip may take the lantern out or put it away when you only want to grab something low with your left hand. |
+
+If the buzz comes in the wrong place (too high, too low or too far back), you can move the spot itself with `LanternHipOffset` on the same line, which takes three numbers: to the side, up, and back. The explanation is at the top of `vr_settings.cfg`. Running `install.bat` again for an update keeps your values.
 
 ---
 

@@ -227,34 +227,44 @@ void iLuxPlayerState_InteractRotateBase::Update(float afTimeStep)
 
 	
 	///////////////////////////////////
-	//Slow down the speed based on the current speed
-	float fSlowDownSpeed = cMath::Abs(mfRotSpeed) * mpMoveBaseData->mfMoveSlowDownFactor;
-	if(mfRotSpeed > 0) 
+	//VR: the hand sets the speed directly
+	float fVRSpeed=0;
+	if(GetVRRotSpeed(afTimeStep, fVRSpeed))
 	{
-		mfRotSpeed -= afTimeStep * fSlowDownSpeed;
-		if(mfRotSpeed < 0) mfRotSpeed = 0;
+		mfRotSpeed = fVRSpeed;
 	}
-	if(mfRotSpeed < 0) 
+	else
 	{
-		mfRotSpeed += afTimeStep * fSlowDownSpeed;
-		if(mfRotSpeed > 0) mfRotSpeed = 0;
-	}
+		///////////////////////////////////
+		//Slow down the speed based on the current speed
+		float fSlowDownSpeed = cMath::Abs(mfRotSpeed) * mpMoveBaseData->mfMoveSlowDownFactor;
+		if(mfRotSpeed > 0) 
+		{
+			mfRotSpeed -= afTimeStep * fSlowDownSpeed;
+			if(mfRotSpeed < 0) mfRotSpeed = 0;
+		}
+		if(mfRotSpeed < 0) 
+		{
+			mfRotSpeed += afTimeStep * fSlowDownSpeed;
+			if(mfRotSpeed > 0) mfRotSpeed = 0;
+		}
 	
-	if(mvMouseAdd == 0)
-	{
-		mfRotSpeed = 0;
-	}
+		if(mvMouseAdd == 0)
+		{
+			mfRotSpeed = 0;
+		}
 	
-	///////////////////////////////////
-	//Get vectors and get move speed
-	float fSpeedAdd = GetSpeedAdd(pCam);
+		///////////////////////////////////
+		//Get vectors and get move speed
+		float fSpeedAdd = GetSpeedAdd(pCam);
 
-	///////////////////////////////////
-	//Change the speed and cap it o max if needed
+		///////////////////////////////////
+		//Change the speed and cap it o max if needed
 	
-	mfRotSpeed +=  fSpeedAdd * 3000.0f * mpMoveBaseData->mfMoveSpeedFactor * afTimeStep;	
-	if(mfRotSpeed > mpMoveBaseData->mfMoveMaxSpeed)	mfRotSpeed = mpMoveBaseData->mfMoveMaxSpeed;
-	if(mfRotSpeed < -mpMoveBaseData->mfMoveMaxSpeed)	mfRotSpeed = -mpMoveBaseData->mfMoveMaxSpeed;
+		mfRotSpeed +=  fSpeedAdd * 3000.0f * mpMoveBaseData->mfMoveSpeedFactor * afTimeStep;	
+		if(mfRotSpeed > mpMoveBaseData->mfMoveMaxSpeed)	mfRotSpeed = mpMoveBaseData->mfMoveMaxSpeed;
+		if(mfRotSpeed < -mpMoveBaseData->mfMoveMaxSpeed)	mfRotSpeed = -mpMoveBaseData->mfMoveMaxSpeed;
+	}
 
 	///////////////////////////////////
 	//Calculate torque

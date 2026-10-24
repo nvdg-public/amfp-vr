@@ -180,7 +180,7 @@ namespace hpl {
 		mfIntervalSum = mfRenderSum = mfWaitSum = 0;
 		mlTimingFrames = 0;
 
-		mbDiagLog = true;
+		mbDiagLog = false;
 		mfDiagStartTime = mfDiagLastTime = 0;
 		mlDiagPoses = mlDiagInvalidPoses = 0;
 		mlDiagTrackingResult = 0;
@@ -545,12 +545,12 @@ namespace hpl {
 		mbHandPointer = cString::ToLowerCase(cfg.GetString("Input", "Pointer", "Hand")) != "head";
 		mfStickDeadZone = cMath::Clamp(cfg.GetFloat("Input", "StickDeadZone", 0.15f), 0.0f, 0.8f);
 		mfTriggerThreshold = cMath::Clamp(cfg.GetFloat("Input", "TriggerThreshold", 0.5f), 0.05f, 1.0f);
-		mbVignette = cfg.GetBool("Vignette", "Enabled", true);
+		mbVignette = cfg.GetBool("Vignette", "Enabled", false);
 		mbVignetteOnTurn = cfg.GetBool("Vignette", "OnTurn", true);
 		mfVignetteStrength = cMath::Clamp(cfg.GetFloat("Vignette", "Strength", 0.5f), 0.0f, 1.0f);
 		mfVignetteFadeIn = cMath::Clamp(cfg.GetFloat("Vignette", "FadeIn", 0.15f), 0.0f, 3.0f);
 		mfVignetteFadeOut = cMath::Clamp(cfg.GetFloat("Vignette", "FadeOut", 0.4f), 0.0f, 3.0f);
-		mbDiagLog = cfg.GetBool("Diagnostics", "Log", true);
+		mbDiagLog = cfg.GetBool("Diagnostics", "Log", false);
 
 		////////////////////////////////
 		// Environment overrides (for tests and quick experiments)

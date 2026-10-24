@@ -85,6 +85,8 @@ protected:
 	virtual void LeaveRotateBase(eLuxPlayerState aNewState){}
 
 	virtual float GetSpeedAdd(cCamera *apCam)=0;
+	/** VR: the rotation speed the hand asks for this step. False = use the mouse logic (GetSpeedAdd). */
+	virtual bool GetVRRotSpeed(float afTimeStep, float &afSpeed){ return false; }
 	virtual void OnThrow()=0;
 
 	void SetupForceAxes();
