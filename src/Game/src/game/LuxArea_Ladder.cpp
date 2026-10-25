@@ -27,6 +27,7 @@
 #include "LuxCompletionCountHandler.h"
 #include "LuxMessageHandler.h"
 #include "LuxMapHandler.h"
+#include "LuxVR.h"
 #include "LuxMap.h"
 
 
@@ -187,6 +188,11 @@ cVector3f cLuxArea_Ladder::GetStartPosition()
 	iCharacterBody *pCharBody = gpBase->mpPlayer->GetCharacterBody();
 
 	cVector3f vCharSize = pCharBody->GetShape(0)->GetSize();
+	// VR: the body is thin (Body CollisionWidth) but as wide as in the flat game against the level (Body WallWidth),
+	// so stand off the ladder by the wide one's radius (a cylinder's size x is its radius), exactly as in the flat game:
+	// with the thin one the spot never fits, further out the body hits the far side of narrow shafts
+	const cLuxVRSettings &vrSettings = cLuxVRSettings::Get();
+	if(vrSettings.mbActive && vrSettings.mfWallWidth*0.5f > vCharSize.x) vCharSize.x = vrSettings.mfWallWidth*0.5f;
 
 	cVector3f vPos = pCharBody->GetPosition();
 	cVector3f vLadderPos =	mpBody->GetWorldPosition() + GetForward()*vCharSize.x *0.6f;

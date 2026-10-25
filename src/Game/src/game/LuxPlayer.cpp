@@ -2018,10 +2018,18 @@ void cLuxPlayer::UpdateVRCrouch()
 void cLuxPlayer::VRSnapTurn(float afAngle)
 {
 	if(mbActive==false) return;
-	if(mState != eLuxPlayerState_Normal && mState != eLuxPlayerState_HandObject && mState != eLuxPlayerState_UseItem) return;
+	// Holding a prop (InteractGrab) may turn too: the prop follows the hand. Doors/levers/valves/sliders may not (the
+	// hand jumps along with the turn and would yank them).
+	if(mState != eLuxPlayerState_Normal && mState != eLuxPlayerState_HandObject && mState != eLuxPlayerState_UseItem &&
+	   mState != eLuxPlayerState_InteractGrab) return;
 
 	mpCamera->AddYaw(afAngle);
 	mpCharBody->SetYaw(mpCamera->GetYaw());
+
+	// The hand's jump is not a throw
+	if(mState == eLuxPlayerState_InteractGrab)
+		static_cast<cLuxPlayerState_InteractGrab*>(mvStates[eLuxPlayerState_InteractGrab])->VRResetHandVelocity();
+	if(mpVRSecondGrab) mpVRSecondGrab->VRResetHandVelocity();
 }
 
 //-----------------------------------------------------------------------

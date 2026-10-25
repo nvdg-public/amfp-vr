@@ -79,6 +79,8 @@ public:
 	void LoadFromSaveDataAfterEnter(cLuxMap *apMap, iLuxPlayerState_SaveData* apSaveData);
 
 protected:
+	bool GetVRSlideSpeed(float afTimeStep, float &afSpeed);
+
 	cLuxInteractData_Slide *mpSlideData;
 
 	cPidController<cVector3f> mForcePid;
@@ -97,6 +99,12 @@ protected:
 
 	float mfMoveToMouseAddFactor;
 	float mfMaxForce;
+
+	// VR: hand position along the slide axis
+	bool mbVRHandValid;
+	int mlVRHand;
+	float mfVRPrevHandPos;
+	float mfVRSlideError;	// metres the hand is ahead of the slider
 	
 };
 

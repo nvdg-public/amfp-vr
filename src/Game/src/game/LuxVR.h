@@ -76,6 +76,7 @@ public:
 	float mfThrowMaxSpeed;	// m/s
 	float mfInteractStrength;	// hand metres -> mouse movement for doors, levers, wheels, sliders
 	bool mbValveFollowHand;	// wheels/valves turn with the hand's angle around their axis (false = hand movement as mouse movement)
+	bool mbSlideFollowHand;	// sliders (drawers, sliding doors) follow the hand along their slide axis (false = hand movement as mouse movement)
 	float mfGrabReach;		// metres: objects are only picked up this close to the controller tip
 	bool mbLanternHip;		// grip with the lantern hand at the hip takes the lantern out / puts it away
 	cVector3f mvLanternHipOffset;	// hip relative to the head: x outward (to the lantern hand's side), y up, z back
@@ -127,7 +128,7 @@ private:
 		mbHeadSpin = false; mLookAt = eLookAt_Snap;
 		mbHeadBob = false; mfScreenShake = 0.3f;
 		mbRadialBlur = false; mbImageTrail = false;
-		mbLanternInHand = true; mbLanternUpright = true; mLanternTurn = eLanternTurn_Point; mfLanternArmPivot = 0.5f; mvLanternOffset = 0; mfLanternYaw = cMath::ToRad(90.0f); mbHaptics = true; mbShowControllers = false; mbShowHands = true; mbOffHandInteract = true; mbLanternHandInteract = true; mbBothHandsHold = true; mfGrabSmallProps = 0.5f; mvGrabSmallPropsExclude.clear(); cString::GetStringVec(kLuxVRGrabSmallPropsExclude, mvGrabSmallPropsExclude); mvHandOffset = cVector3f(0.03f, -0.04f, 0.14f); mvHandRotation = 0; mfFingerCurl = 85.0f; mfThrowMul = 1.0f; mfThrowMaxSpeed = 10.0f; mfInteractStrength = 1.0f; mbValveFollowHand = true; mfGrabReach = 0.15f; mbLanternHip = true; mvLanternHipOffset = cVector3f(0.2f, -0.7f, 0.15f); mfLanternHipRadius = 0.25f; mfInteractReach = 0.2f; mfBodyWidth = 0.3f; mfEnemyHitWidth = 0.8f; mfEnemyAimAssist = cMath::ToRad(90.0f); mbOutOfMapKill = true; mfWallWidth = 0.8f; mbRealCrouchKeepHeight = true;
+		mbLanternInHand = true; mbLanternUpright = true; mLanternTurn = eLanternTurn_Point; mfLanternArmPivot = 0.5f; mvLanternOffset = 0; mfLanternYaw = cMath::ToRad(90.0f); mbHaptics = true; mbShowControllers = false; mbShowHands = true; mbOffHandInteract = true; mbLanternHandInteract = true; mbBothHandsHold = true; mfGrabSmallProps = 0.5f; mvGrabSmallPropsExclude.clear(); cString::GetStringVec(kLuxVRGrabSmallPropsExclude, mvGrabSmallPropsExclude); mvHandOffset = cVector3f(0.03f, -0.04f, 0.14f); mvHandRotation = 0; mfFingerCurl = 85.0f; mfThrowMul = 1.0f; mfThrowMaxSpeed = 10.0f; mfInteractStrength = 1.0f; mbValveFollowHand = true; mbSlideFollowHand = true; mfGrabReach = 0.15f; mbLanternHip = true; mvLanternHipOffset = cVector3f(0.2f, -0.7f, 0.15f); mfLanternHipRadius = 0.25f; mfInteractReach = 0.2f; mfBodyWidth = 0.3f; mfEnemyHitWidth = 0.8f; mfEnemyAimAssist = cMath::ToRad(90.0f); mbOutOfMapKill = true; mfWallWidth = 0.8f; mbRealCrouchKeepHeight = true;
 		mfReticleSize = 0.6f; mfReticleMinDist = 0.3f; mfReticleMaxDist = 8.0f;
 		if(pCfg==NULL) return;
 
@@ -173,6 +174,7 @@ private:
 		mfThrowMaxSpeed = cMath::Clamp(pCfg->GetFloat("Hands", "ThrowMaxSpeed", 10.0f), 1.0f, 30.0f);
 		mfInteractStrength = cMath::Clamp(pCfg->GetFloat("Hands", "InteractStrength", 1.0f), 0.1f, 20.0f);
 		mbValveFollowHand = pCfg->GetBool("Hands", "ValveFollowHand", true);
+		mbSlideFollowHand = pCfg->GetBool("Hands", "SlideFollowHand", true);
 		mfGrabReach = cMath::Clamp(pCfg->GetFloat("Hands", "GrabReach", 0.15f), 0.0f, 3.0f);
 		mbLanternHip = pCfg->GetBool("Hands", "LanternHip", true);
 		mvLanternHipOffset = pCfg->GetVector3f("Hands", "LanternHipOffset", cVector3f(0.2f, -0.7f, 0.15f));

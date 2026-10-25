@@ -161,6 +161,18 @@ namespace hpl {
 		mlDataPos =0;
 		size_t lOut = 0;
 
+		//Out of memory: fread into a NULL chunk would kill the process (CRT invalid parameter)
+		for(size_t i = 0; i < mvDataChunks.size(); ++i)
+		{
+			if(mvDataChunks[i]==NULL)
+			{
+				Error("Out of memory loading binary file '%ls' (%u bytes)\n", asFile.c_str(), (unsigned int)lFileSize);
+				fclose(pFile);
+				Clear();
+				return false;
+			}
+		}
+
 		////////////////////////////
 		// Load data from file
 		for(size_t i = 0; i < mvDataChunks.size(); ++i)

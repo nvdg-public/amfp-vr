@@ -40,6 +40,7 @@ cLuxPlayerState_InteractGrab::cLuxPlayerState_InteractGrab(cLuxPlayer *apPlayer)
 	mbVRHand = false;
 	meVRHand = eVRHand_Right;
 	mbVRHandVelValid = false;
+	mbVRHandPrevSkip = false;
 	mfMaxForce = gpBase->mpGameCfg->GetFloat("Player_Interaction","GrabMaxForce",0);
 	mfMaxTorque = gpBase->mpGameCfg->GetFloat("Player_Interaction","GrabMaxTorque",0);
 	mfMaxAngularSpeed = gpBase->mpGameCfg->GetFloat("Player_Interaction","GrabMaxAngularSpeed",0);
@@ -93,6 +94,7 @@ void cLuxPlayerState_InteractGrab::OnEnterState(eLuxPlayerState aPrevState)
 	mbVRHand = LuxVRGetPointerMatrix(pCam, mtxHand);
 	meVRHand = cVRSystem::Get()->GetPointerHand();
 	mbVRHandVelValid = false;
+	mbVRHandPrevSkip = false;
 	mvVRHandVel = 0;
 	if(mbVRHand)
 	{
@@ -330,9 +332,13 @@ void cLuxPlayerState_InteractGrab::PostUpdate(float afTimeStep)
 
 		// Hand speed (smoothed), for throwing by letting go
 		cVector3f vHandPos = mtxCamTransform.GetTranslation();
-		cVector3f vVel = (vHandPos - mvVRPrevHandPos) / afTimeStep;
-		mvVRHandVel = mbVRHandVelValid ? mvVRHandVel*0.5f + vVel*0.5f : vVel;
-		mbVRHandVelValid = true;
+		if(mbVRHandPrevSkip==false)
+		{
+			cVector3f vVel = (vHandPos - mvVRPrevHandPos) / afTimeStep;
+			mvVRHandVel = mbVRHandVelValid ? mvVRHandVel*0.5f + vVel*0.5f : vVel;
+			mbVRHandVelValid = true;
+		}
+		mbVRHandPrevSkip = false;
 		mvVRPrevHandPos = vHandPos;
 	}
 	else

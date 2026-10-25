@@ -99,6 +99,8 @@ public:
 	// VR: held by a hand, and which one
 	bool IsHeldByVRHand(){ return mbVRHand; }
 	eVRHand GetVRHand(){ return meVRHand; }
+	/** VR: forget the hand's speed (a snap turn moved it), so letting go right after does not throw. */
+	void VRResetHandVelocity(){ mbVRHandVelValid = false; mvVRHandVel = 0; mbVRHandPrevSkip = true; }
 	iLuxPlayerState_SaveData* CreateSaveData();
 
 	void SaveToSaveData(iLuxPlayerState_SaveData* apSaveData);
@@ -136,6 +138,7 @@ protected:
 	cVector3f mvVRPrevHandPos;
 	cVector3f mvVRHandVel;
 	bool mbVRHandVelValid;
+	bool mbVRHandPrevSkip;	// next step: only take the hand position, no speed
 
 	cPidController<cVector3f> mForcePid;
 	cPidController<cVector3f> mSpeedTorquePid;

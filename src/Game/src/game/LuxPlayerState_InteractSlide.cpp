@@ -25,6 +25,7 @@
 #include "LuxMapHelper.h"
 #include "LuxProp.h"
 #include "LuxInputHandler.h"
+#include "LuxVR.h"
 
 //-----------------------------------------------------------------------
 
@@ -79,6 +80,9 @@ void cLuxPlayerState_InteractSlide::OnEnterState(eLuxPlayerState aPrevState)
 
 	mfSlideSpeed =0;
 
+	mbVRHandValid = false;
+	mfVRSlideError = 0;
+
 	/////////////////////////////////
 	//Setup body
 	mbHasGravity = mpCurrentBody->GetGravity();
@@ -132,31 +136,41 @@ void cLuxPlayerState_InteractSlide::Update(float afTimeStep)
 	}
 
 	//////////////////////////////
-	//Get the speed add.
-	cVector3f vMouseCamDir = vUp * mvMouseAdd.y + vRight * -mvMouseAdd.x;
-	float fSpeedAdd = cMath::Vector3Dot(vMouseCamDir, mpCurrentJoint->GetPinDir());
+	//VR: the hand sets the speed directly
+	float fVRSpeed=0;
+	if(GetVRSlideSpeed(afTimeStep, fVRSpeed))
+	{
+		mfSlideSpeed = fVRSpeed;
+	}
+	else
+	{
+		//////////////////////////////
+		//Get the speed add.
+		cVector3f vMouseCamDir = vUp * mvMouseAdd.y + vRight * -mvMouseAdd.x;
+		float fSpeedAdd = cMath::Vector3Dot(vMouseCamDir, mpCurrentJoint->GetPinDir());
 
 
-	//////////////////////////////
-	//Update speed
-	float fSlowDownSpeed = cMath::Abs(mfSlideSpeed) * 3.0f * mpSlideData->mfSlideSlowDownFactor;
-	if(mfSlideSpeed > 0) 
-	{
-		mfSlideSpeed -= afTimeStep * fSlowDownSpeed;
-		if(mfSlideSpeed < 0) mfSlideSpeed = 0;
+		//////////////////////////////
+		//Update speed
+		float fSlowDownSpeed = cMath::Abs(mfSlideSpeed) * 3.0f * mpSlideData->mfSlideSlowDownFactor;
+		if(mfSlideSpeed > 0) 
+		{
+			mfSlideSpeed -= afTimeStep * fSlowDownSpeed;
+			if(mfSlideSpeed < 0) mfSlideSpeed = 0;
+		}
+		if(mfSlideSpeed < 0) 
+		{
+			mfSlideSpeed += afTimeStep * fSlowDownSpeed;
+			if(mfSlideSpeed > 0) mfSlideSpeed = 0;
+		}
+		if(mvMouseAdd == 0)
+		{
+			mfSlideSpeed = 0;
+		}
+		mfSlideSpeed += fSpeedAdd * 850.0f * afTimeStep  * mpSlideData->mfSlideSpeedFactor;
+		if(mfSlideSpeed > mpSlideData->mfSlideMaxSpeed)	mfSlideSpeed = mpSlideData->mfSlideMaxSpeed;
+		if(mfSlideSpeed < -mpSlideData->mfSlideMaxSpeed)mfSlideSpeed = -mpSlideData->mfSlideMaxSpeed;
 	}
-	if(mfSlideSpeed < 0) 
-	{
-		mfSlideSpeed += afTimeStep * fSlowDownSpeed;
-		if(mfSlideSpeed > 0) mfSlideSpeed = 0;
-	}
-	if(mvMouseAdd == 0)
-	{
-		mfSlideSpeed = 0;
-	}
-	mfSlideSpeed += fSpeedAdd * 850.0f * afTimeStep  * mpSlideData->mfSlideSpeedFactor;
-	if(mfSlideSpeed > mpSlideData->mfSlideMaxSpeed)	mfSlideSpeed = mpSlideData->mfSlideMaxSpeed;
-	if(mfSlideSpeed < -mpSlideData->mfSlideMaxSpeed)mfSlideSpeed = -mpSlideData->mfSlideMaxSpeed;
 
 
 	//////////////////////////////
@@ -177,6 +191,56 @@ void cLuxPlayerState_InteractSlide::Update(float afTimeStep)
 	//Last stuff
 	mvLastMouseAdd = mvMouseAdd;
 	mvMouseAdd = 0;
+}
+
+//-----------------------------------------------------------------------
+
+/**
+ * VR (Hands SlideFollowHand): the slider follows the hand along its own axis (the joint's pin, so a vertical door
+ * moves with the hand going up/down). Each step the grip's movement along the pin is added to how far the hand is
+ * ahead of the body, the body's own movement along the pin is taken off, and the wanted speed closes that gap. The gap
+ * is capped, so a slider at its limit does not wind up. False = use the mouse logic.
+ */
+bool cLuxPlayerState_InteractSlide::GetVRSlideSpeed(float afTimeStep, float &afSpeed)
+{
+	const float kfMaxError = 0.15f;	// metres
+	const float kfGain = 10.0f;		// 1/s: how fast the slider catches up with the hand
+	const float kfMaxSpeed = 3.0f;	// m/s
+
+	cVRSystem *pVR = cVRSystem::Get();
+	if(cLuxVRSettings::Get().mbSlideFollowHand==false || pVR->IsActive()==false || pVR->UsesHandPointer()==false) return false;
+
+	afSpeed = 0;
+	eVRHand hand = pVR->GetPointerHand();
+	cMatrixf mtxGrip;
+	if(pVR->GetHandGripPose(hand, mtxGrip)==false)
+	{
+		mbVRHandValid = false;
+		mfVRSlideError = 0;
+		return true;
+	}
+
+	cVector3f vPin = cMath::Vector3Normalize(mpCurrentJoint->GetPinDir());
+	cVector3f vHand = cMath::MatrixMul(pVR->GetSeatedToWorld(mpPlayer->GetCamera()), mtxGrip.GetTranslation());
+	float fHandPos = cMath::Vector3Dot(vHand, vPin);
+
+	if(mbVRHandValid==false || mlVRHand != (int)hand)
+	{
+		mfVRPrevHandPos = fHandPos;
+		mfVRSlideError = 0;
+		mlVRHand = (int)hand;
+		mbVRHandValid = true;
+		return true;
+	}
+	mfVRSlideError += fHandPos - mfVRPrevHandPos;
+	mfVRPrevHandPos = fHandPos;
+
+	float fBodySpeed = cMath::Vector3Dot(vPin, mpCurrentBody->GetLinearVelocity());
+	mfVRSlideError -= fBodySpeed * afTimeStep;
+	mfVRSlideError = cMath::Clamp(mfVRSlideError, -kfMaxError, kfMaxError);
+
+	afSpeed = cMath::Clamp(mfVRSlideError * kfGain, -kfMaxSpeed, kfMaxSpeed);
+	return true;
 }
 
 //-----------------------------------------------------------------------
