@@ -102,6 +102,16 @@ Good values to try:
 
 If the buzz comes in the wrong place (too high, too low or too far back), you can move the spot itself with `LanternHipOffset` on the same line, which takes three numbers: to the side, up, and back. The explanation is at the top of `vr_settings.cfg`. Running `install.bat` again for an update keeps your values.
 
+## Can't reach the valve in chapter 9?
+
+In chapter 9 there is a valve that sits far away from where you can stand, so your hand may not reach it, especially when your play area ends before your arm does. Recentering lets you step past the edge of your play area for a moment:
+
+1. In the game, walk as close to the valve as you can.
+2. In real life, step back so there is some free space between you and the valve's direction.
+3. **Recenter** (right stick click, or F9).
+4. Now walk forward in real life, beyond your play area's boundary if needed, until your hand reaches the valve, and turn it.
+5. Step back into your play area and **recenter** again, so your position in the game is right again.
+
 ---
 
 ## Building from source

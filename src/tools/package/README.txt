@@ -45,6 +45,10 @@ SteamVR > Settings > Controllers > Manage controller bindings.
 
 Recenter: click the right stick (or press F9).
 
+Far valve in chapter 9: if your hand can not reach it, walk as close to the valve as you can in the game,
+step back in your room to make some space towards it, and recenter. Then walk forward in real life (past your
+play area boundary if needed) and turn the valve. Recenter again afterwards to set your position in the game right.
+
 
 Uninstalling
 ------------
