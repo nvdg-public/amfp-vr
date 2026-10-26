@@ -226,7 +226,11 @@ namespace hpl {
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
         unsigned int mlFlags = SDL_WINDOW_OPENGL;
-        if (alWidth == 0 && alHeight == 0) {
+        if (bVR) {
+            // VR mirror window (vr_settings.cfg Mirror Window)
+            if (cVRSystem::Get()->GetMirrorWindow() == eVRMirrorWindow_Borderless) mlFlags |= SDL_WINDOW_BORDERLESS;
+            else if (cVRSystem::Get()->GetMirrorWindow() == eVRMirrorWindow_Fullscreen) mlFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+        } else if (alWidth == 0 && alHeight == 0) {
             mvScreenSize = cVector2l(800,600);
             mlFlags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
         } else if (abFullscreen) {

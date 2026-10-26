@@ -94,6 +94,16 @@ namespace hpl {
 		mfMenuDistance = 2.0f; mfMenuWidth = 2.0f; mfMenuHeight = 0.0f;
 		mlRecenterKey = 0;
 		mbMirrorEnabled = true;
+		mbMirrorFill = true;
+		mfMirrorZoom = 1.0f;
+		mMirrorWindow = eVRMirrorWindow_Normal;
+		mbMirrorCompositor = false;
+		mbMirrorCompositorFailed = false;
+		mvMirrorFov[0] = mvMirrorFov[2] = -1;
+		mvMirrorFov[1] = mvMirrorFov[3] = 1;
+		mlMirrorTexture = mlMirrorFramebuffer = 0;
+		mpMirrorShared = NULL;
+		mvMirrorTextureSize = cVector2l(0,0);
 		mlRenderingEye = -1;
 		mbAsymmetricProjection = true;
 		mbEdgeSmooth = false;
@@ -317,6 +327,10 @@ namespace hpl {
 		}
 		mfTanX = fMaxX;
 		mfTanY = fMaxY;
+		mvMirrorFov[0] = vRaw[0][0];
+		mvMirrorFov[1] = vRaw[0][1];
+		mvMirrorFov[2] = -vRaw[0][3];
+		mvMirrorFov[3] = -vRaw[0][2];
 
 		LoadSettings();
 		InitInput();
@@ -539,6 +553,12 @@ namespace hpl {
 		mfHeadMaxUp = cfg.GetFloat("Body", "MaxHeadRise", 0.15f);
 		mvMirrorSize.x = cfg.GetInt("Mirror", "Width", 1280);
 		mvMirrorSize.y = cfg.GetInt("Mirror", "Height", 720);
+		mbMirrorFill = cString::ToLowerCase(cfg.GetString("Mirror", "Fit", "Fill")) != "fit";
+		mfMirrorZoom = cMath::Clamp(cfg.GetFloat("Mirror", "Zoom", 1.0f), 1.0f, 4.0f);
+		tString sMirrorWindow = cString::ToLowerCase(cfg.GetString("Mirror", "Window", "Normal"));
+		mMirrorWindow = sMirrorWindow == "borderless" ? eVRMirrorWindow_Borderless :
+						sMirrorWindow == "fullscreen" ? eVRMirrorWindow_Fullscreen : eVRMirrorWindow_Normal;
+		mbMirrorCompositor = cString::ToLowerCase(cfg.GetString("Mirror", "Source", "Game")) == "compositor";
 		mbLeftHanded = cfg.GetBool("Input", "LeftHanded", false);
 		mPointerHand = cString::ToLowerCase(cfg.GetString("Input", "Hand", mbLeftHanded ? "Left" : "Right")) == "left" ? eVRHand_Left : eVRHand_Right;
 		mActiveHand = mPointerHand;
@@ -574,6 +594,9 @@ namespace hpl {
 		Log(" VR settings: render scale %.2f, refresh hint %d, menu %.2f m away %.2f m wide (height %.2f), recenter key 0x%x, mirror %s %dx%d\n",
 			mfRenderScale, mlRefreshRateHint, mfMenuDistance, mfMenuWidth, mfMenuHeight, mlRecenterKey,
 			mbMirrorEnabled ? "on" : "off", mvMirrorSize.x, mvMirrorSize.y);
+		Log(" VR settings: mirror %s, zoom %.2f, %s window, source %s\n", mbMirrorFill ? "fill" : "fit", mfMirrorZoom,
+			mMirrorWindow==eVRMirrorWindow_Borderless ? "borderless" : mMirrorWindow==eVRMirrorWindow_Fullscreen ? "fullscreen" : "normal",
+			mbMirrorCompositor ? "compositor" : "game");
 		Log(" VR settings: projection %s, edge smooth %s\n", mbAsymmetricProjection ? "asymmetric" : "symmetric", mbEdgeSmooth ? "on" : "off");
 	}
 
@@ -815,6 +838,10 @@ namespace hpl {
 		if(mlGuiPanelFramebuffer) glDeleteFramebuffersEXT(1, &mlGuiPanelFramebuffer);
 		if(mlGuiPanelTexture) glDeleteTextures(1, &mlGuiPanelTexture);
 		mlGuiPanelFramebuffer = mlGuiPanelTexture = 0;
+		if(mlMirrorFramebuffer) glDeleteFramebuffersEXT(1, &mlMirrorFramebuffer);
+		if(mlMirrorTexture) vr::VRCompositor()->ReleaseSharedGLTexture(mlMirrorTexture, mpMirrorShared);
+		mlMirrorFramebuffer = mlMirrorTexture = 0;
+		mpMirrorShared = NULL;
 		vr::VR_Shutdown();
 		gpHmd = NULL;
 #endif
@@ -1124,18 +1151,53 @@ namespace hpl {
 			return;
 		}
 
-		// Left eye, cropped to its real frustum, fitted into the window
-		int lSrcX0 = (int)(mvBounds[0][0] * mvRenderSize.x);
-		int lSrcX1 = (int)(mvBounds[0][2] * mvRenderSize.x);
-		int lSrcY0 = (int)((1.0f - mvBounds[0][3]) * mvRenderSize.y);
-		int lSrcY1 = (int)((1.0f - mvBounds[0][1]) * mvRenderSize.y);
+		// Source image: the left eye as rendered, or SteamVR's mirror of it (with the menu panel overlay)
+		unsigned int lReadFramebuffer = mvEyeFramebuffer[0];
+		cVector2l vSrcSize = mvRenderSize;
+		const float *pSrcTan = mvEyeTan[0];	// frustum the source image covers
+#ifdef HPL_VR
+		if(mbMirrorCompositor && mlMirrorTexture==0 && mbMirrorCompositorFailed==false) CreateCompositorMirror();
+		if(mlMirrorTexture)
+		{
+			lReadFramebuffer = mlMirrorFramebuffer;
+			vSrcSize = mvMirrorTextureSize;
+			pSrcTan = mvMirrorFov;
+			vr::VRCompositor()->LockGLSharedTextureForAccess(mpMirrorShared);
+		}
+#endif
 
-		float fSrcAspect = (float)(lSrcX1-lSrcX0) / (float)(lSrcY1-lSrcY0);
-		int lDstW = avWindowSize.x, lDstH = (int)(avWindowSize.x / fSrcAspect);
-		if(lDstH > avWindowSize.y) { lDstH = avWindowSize.y; lDstW = (int)(avWindowSize.y * fSrcAspect); }
+		// Part of the left eye's real frustum to show (tangent space, y up): the window's shape when filling,
+		// narrowed by the zoom, centred on the eye's optical axis as far as the frustum allows
+		float fWinAspect = (float)avWindowSize.x / (float)cMath::Max(avWindowSize.y, 1);
+		float fW = mvMirrorFov[1] - mvMirrorFov[0], fH = mvMirrorFov[3] - mvMirrorFov[2];
+		if(mbMirrorFill)
+		{
+			if(fW / fH > fWinAspect) fW = fH * fWinAspect;
+			else fH = fW / fWinAspect;
+		}
+		fW /= mfMirrorZoom;
+		fH /= mfMirrorZoom;
+		float fCX = cMath::Clamp(0.0f, mvMirrorFov[0] + fW*0.5f, mvMirrorFov[1] - fW*0.5f);
+		float fCY = cMath::Clamp(0.0f, mvMirrorFov[2] + fH*0.5f, mvMirrorFov[3] - fH*0.5f);
+
+		// To source pixels (GL rows go up, like the tangent y)
+		float fSrcTanW = pSrcTan[1] - pSrcTan[0], fSrcTanH = pSrcTan[3] - pSrcTan[2];
+		int lSrcX0 = (int)((fCX - fW*0.5f - pSrcTan[0]) / fSrcTanW * vSrcSize.x);
+		int lSrcX1 = (int)((fCX + fW*0.5f - pSrcTan[0]) / fSrcTanW * vSrcSize.x);
+		int lSrcY0 = (int)((fCY - fH*0.5f - pSrcTan[2]) / fSrcTanH * vSrcSize.y);
+		int lSrcY1 = (int)((fCY + fH*0.5f - pSrcTan[2]) / fSrcTanH * vSrcSize.y);
+
+		// Into the window: all of it when filling, else with black bars
+		int lDstW = avWindowSize.x, lDstH = avWindowSize.y;
+		if(mbMirrorFill==false)
+		{
+			float fSrcAspect = fW / fH;
+			lDstH = (int)(avWindowSize.x / fSrcAspect);
+			if(lDstH > avWindowSize.y) { lDstH = avWindowSize.y; lDstW = (int)(avWindowSize.y * fSrcAspect); }
+		}
 		int lDstX = (avWindowSize.x - lDstW)/2, lDstY = (avWindowSize.y - lDstH)/2;
 
-		glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, mvEyeFramebuffer[0]);
+		glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, lReadFramebuffer);
 		glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, 0);
 		glDisable(GL_SCISSOR_TEST);
 		glViewport(0, 0, avWindowSize.x, avWindowSize.y);
@@ -1143,6 +1205,57 @@ namespace hpl {
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBlitFramebufferEXT(lSrcX0, lSrcY0, lSrcX1, lSrcY1, lDstX, lDstY, lDstX+lDstW, lDstY+lDstH, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+#ifdef HPL_VR
+		if(mlMirrorTexture) vr::VRCompositor()->UnlockGLSharedTextureForAccess(mpMirrorShared);
+#endif
+	}
+
+	//-----------------------------------------------------------------------
+
+	/**
+	 * Mirror Source="Compositor": fetches SteamVR's mirror texture of the left eye once (it stays valid for the
+	 * session) and attaches it to a framebuffer to blit from. On failure the mirror shows the game's eye image.
+	 */
+	void cVRSystem::CreateCompositorMirror()
+	{
+#ifdef HPL_VR
+		vr::glUInt_t lTex = 0;
+		vr::glSharedTextureHandle_t pShared = NULL;
+		vr::EVRCompositorError err = vr::VRCompositor()->GetMirrorTextureGL(vr::Eye_Left, &lTex, &pShared);
+		if(err != vr::VRCompositorError_None || lTex==0)
+		{
+			Warning("VR: no compositor mirror texture (error %d), the mirror shows the game's eye image\n", (int)err);
+			mbMirrorCompositorFailed = true;
+			return;
+		}
+
+		int w=0, h=0;
+		glBindTexture(GL_TEXTURE_2D, lTex);
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &h);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		GLuint lFramebuffer = 0;
+		glGenFramebuffersEXT(1, &lFramebuffer);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, lFramebuffer);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, lTex, 0);
+		GLenum status = glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		if(w<=0 || h<=0 || status != GL_FRAMEBUFFER_COMPLETE_EXT)
+		{
+			Warning("VR: compositor mirror texture unusable (%dx%d, status 0x%x), the mirror shows the game's eye image\n", w, h, status);
+			glDeleteFramebuffersEXT(1, &lFramebuffer);
+			vr::VRCompositor()->ReleaseSharedGLTexture(lTex, pShared);
+			mbMirrorCompositorFailed = true;
+			return;
+		}
+
+		mlMirrorTexture = lTex;
+		mpMirrorShared = pShared;
+		mlMirrorFramebuffer = lFramebuffer;
+		mvMirrorTextureSize = cVector2l(w, h);
+		Log("VR: mirror shows SteamVR's compositor image (%dx%d)\n", w, h);
+#endif
 	}
 
 	//-----------------------------------------------------------------------

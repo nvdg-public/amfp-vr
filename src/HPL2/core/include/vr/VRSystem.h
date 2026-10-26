@@ -53,6 +53,17 @@ namespace hpl {
 
 	//------------------------------------------------------------
 
+	/** Kind of desktop mirror window (vr_settings.cfg Mirror Window). */
+	enum eVRMirrorWindow
+	{
+		eVRMirrorWindow_Normal,		// window with a title bar, Width x Height
+		eVRMirrorWindow_Borderless,	// no title bar or border, Width x Height, centred on the display
+		eVRMirrorWindow_Fullscreen,	// borderless, covers the whole display (Width/Height ignored)
+		eVRMirrorWindow_LastEnum
+	};
+
+	//------------------------------------------------------------
+
 	enum eVRHand
 	{
 		eVRHand_Left,
@@ -113,6 +124,8 @@ namespace hpl {
 		cVector2l GetRenderSize() const { return mvRenderSize; }
 		/** Size requested for the desktop mirror window. */
 		cVector2l GetMirrorSize() const { return mvMirrorSize; }
+		/** Kind of desktop mirror window (vr_settings.cfg Mirror Window). */
+		eVRMirrorWindow GetMirrorWindow() const { return mMirrorWindow; }
 		/** Whether the renderer's screen-space edge smoothing runs in VR. */
 		bool GetEdgeSmooth() const { return mbEdgeSmooth; }
 
@@ -321,6 +334,18 @@ namespace hpl {
 		float mfMenuDistance, mfMenuWidth, mfMenuHeight;
 		int mlRecenterKey;
 		bool mbMirrorEnabled;
+
+		// Desktop mirror (vr_settings.cfg Mirror): what part of the left eye it shows, and from which image
+		bool mbMirrorFill;			// Fit="Fill": crop to the window's shape instead of black bars
+		float mfMirrorZoom;
+		eVRMirrorWindow mMirrorWindow;
+		bool mbMirrorCompositor;	// Source="Compositor": SteamVR's mirror image (includes the menu panel overlay)
+		bool mbMirrorCompositorFailed;
+		float mvMirrorFov[4];		// left eye's real frustum sides: left, right, bottom, top (GL convention)
+		unsigned int mlMirrorTexture, mlMirrorFramebuffer;
+		void *mpMirrorShared;
+		cVector2l mvMirrorTextureSize;
+		void CreateCompositorMirror();
 
 		// Comfort vignette (vr_settings.cfg Vignette): darkens the edges of the view during artificial movement
 		void DrawVignette();

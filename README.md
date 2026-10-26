@@ -112,6 +112,14 @@ In chapter 9 there is a valve that sits far away from where you can stand, so yo
 4. Now walk forward in real life, beyond your play area's boundary if needed, until your hand reaches the valve, and turn it.
 5. Step back into your play area and **recenter** again, so your position in the game is right again.
 
+## Recording a video
+
+The game's window on your desktop mirrors your left eye. Its size has nothing to do with the headset's resolution, so you can make it any size you want to record (with OBS, for example) without changing what you see in VR. In `vr_settings.cfg`, on the `Mirror` line:
+
+- `Width="1920" Height="1080"` (or any size) sets the picture's size, and `Window="Borderless"` removes the title bar so the window is exactly that size.
+- `Fit="Fill"` (default) fills the whole picture, `Zoom="1.4"` shows a narrower view that looks calmer on video.
+- `Source="Compositor"` also shows the menus, notes and hints, which the game's own eye image doesn't include.
+
 ---
 
 ## Building from source
