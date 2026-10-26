@@ -703,6 +703,7 @@ void cLuxMapHandler::CheckMapChange(float afTimeStep)
 		// Run enter script! (otherwise a save in oneter will not be correct!)
 		if(bFirstTime) mpCurrentMap->RunScript("OnStart()");
 		mpCurrentMap->RunScript("OnEnter()");
+		mpCurrentMap->RunTestTeleport();
 
 
 		mpSavedGameMutex->Unlock();

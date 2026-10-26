@@ -176,7 +176,9 @@ bool cLuxProp_Lever::OnInteract(iPhysicsBody *apBody, const cVector3f &avPos)
 		}
 	}
 
-	if(mlStuckState !=0 && mbInteractionDisablesStuck)
+	// Test launchers: HPL_TEST_FREE_LEVERS=1 lets every stuck lever move when touched (story-locked levers)
+	static const bool bTestFreeLevers = getenv("HPL_TEST_FREE_LEVERS") != NULL;
+	if(mlStuckState !=0 && (mbInteractionDisablesStuck || bTestFreeLevers))
 		SetStuckState(0, true);
 
 	if(mlStuckState ==0 && mbShowHints)

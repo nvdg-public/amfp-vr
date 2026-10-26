@@ -5,7 +5,14 @@
 #  - uses a separate profile "dev_user" (Documents\Amnesia\Pig\dev_user)
 #  - temporarily turns off the intro/menu in main_settings.cfg and turns on the F1 debug menu,
 #    then restores main_settings.cfg exactly when the game exits.
-param([string]$Map = "13_pigline.map", [string]$StartPos = "AtSpotlight", [switch]$VR)
+#
+# Options for other tests:
+#  -Teleport <PlayerStart>  move the player there right after the map's own start script (for maps whose
+#                           OnStart always teleports the player, e.g. 01_mansion_01)
+#  -ScriptDebug             ScriptDebugOn in the dev profile (most maps then skip their intro and give a lantern)
+#  -FreeLevers              story-locked (stuck) levers move when touched
+param([string]$Map = "13_pigline.map", [string]$StartPos = "AtSpotlight", [switch]$VR,
+      [string]$Teleport = "", [switch]$ScriptDebug, [switch]$FreeLevers)
 
 $ErrorActionPreference = "Stop"
 $Run  = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -46,11 +53,14 @@ try {
     $u = [IO.File]::ReadAllText($src)
     $mapEl = "<Map File=`"$Map`" Folder=`"maps/`" StartPos=`"$StartPos`" />"
     if ($u -match '<Map [^>]*/>') { $u = $u -replace '<Map [^>]*/>', $mapEl } else { $u = $u.TrimEnd() + "`r`n" + $mapEl + "`r`n" }
+    $u = $u -replace 'ScriptDebugOn="\w+"', ('ScriptDebugOn="{0}"' -f $(if ($ScriptDebug) { "true" } else { "false" }))
     [IO.File]::WriteAllText($UserCfg, $u)
 
     # ---- run (game folder as working dir; FBX caches from data_overlay)
     $env:HPL_CACHE_OVERLAY = Join-Path $Root "data_overlay"
     if ($VR) { $env:HPL_VR = "1" } else { Remove-Item Env:HPL_VR -ErrorAction SilentlyContinue }
+    $env:HPL_TEST_TELEPORT = $Teleport
+    if ($FreeLevers) { $env:HPL_TEST_FREE_LEVERS = "1" } else { Remove-Item Env:HPL_TEST_FREE_LEVERS -ErrorAction SilentlyContinue }
     Write-Host "Starting $Map at $StartPos ... (this window restores your settings when the game closes)"
     $proc = Start-Process -FilePath (Join-Path $Run "aamfp.exe") -WorkingDirectory $Game -PassThru
     $proc.WaitForExit()

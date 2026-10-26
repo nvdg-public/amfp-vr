@@ -84,6 +84,8 @@ public:
 	void AfterWorldLoadEntitySetup();
 	
 	void OnEnter(bool abRunScript, bool abFirstTime);
+	/** Test launchers: HPL_TEST_TELEPORT=<PlayerStart name> moves the player there once, after the map's own start script. */
+	void RunTestTeleport();
 	void OnLeave(bool abRunScript);
 	
 	void Update(float afTimeStep);

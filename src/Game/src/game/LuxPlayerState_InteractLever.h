@@ -57,10 +57,22 @@ public:
 	void LoadFromSaveDataAfterEnter(cLuxMap *apMap, iLuxPlayerState_SaveData* apSaveData);
 
 protected:
+	void EnterRotateBase(eLuxPlayerState aPrevState);
+
 	float GetSpeedAdd(cCamera *apCam);
+	bool GetVRRotSpeed(float afTimeStep, float &afSpeed);
 	void OnThrow();
 
 	cLuxInteractData_Lever *mpLeverData;
+
+	// VR: hand angle around the lever's hinge
+	bool mbVRAngleValid;
+	int mlVRHand;
+	cVector3f mvVRGrabLocal;	// where the lever was touched, in body space
+	cVector3f mvVRHandOffset;	// added to the hand (in the hinge plane) when the hand is too close to the hinge
+	cVector3f mvVRAxisU, mvVRAxisV;	// basis of the hinge plane
+	float mfVRPrevAngle;
+	float mfVRAngleError;	// radians the hand is ahead of the lever
 
 };
 

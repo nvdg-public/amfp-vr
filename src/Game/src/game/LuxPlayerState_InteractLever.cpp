@@ -26,6 +26,7 @@
 #include "LuxProp.h"
 #include "LuxMoveState_Normal.h"
 #include "LuxInputHandler.h"
+#include "LuxVR.h"
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTRUCTORS
@@ -122,6 +123,105 @@ float cLuxPlayerState_InteractLever::GetSpeedAdd(cCamera *apCam)
 	float fSpeedAdd = cMath::Vector3Dot(vPushRotateDir, mpCurrentJoint->GetPinDir());
 
 	return fSpeedAdd;
+}
+
+//-----------------------------------------------------------------------
+
+void cLuxPlayerState_InteractLever::EnterRotateBase(eLuxPlayerState aPrevState)
+{
+	mbVRAngleValid = false;
+	mfVRAngleError = 0;
+	mvVRGrabLocal = cMath::MatrixMul(cMath::MatrixInverse(mpCurrentBody->GetLocalMatrix()), mvCurrentFocusPos);
+}
+
+//-----------------------------------------------------------------------
+
+/**
+ * VR (Hands LeverFollowHand): the lever follows the hand's angle around its hinge, like the valves. The grip position
+ * is projected onto the hinge plane; each step's change of its angle there is added to how far the hand is ahead of
+ * the lever, the lever's own turning (along the pin) is taken off, and the wanted speed closes that gap. The gap is
+ * capped, so a lever at its limit (or stuck) does not wind up. When the hand starts closer than 12 cm to the hinge
+ * (short handles), the angle is taken at the point where the lever was touched (kept at least 12 cm out) moved by
+ * the hand's movement since then, so a small handle still turns as far as the hand moves along it.
+ */
+bool cLuxPlayerState_InteractLever::GetVRRotSpeed(float afTimeStep, float &afSpeed)
+{
+	const float kfDeadZone = 0.03f;
+	const float kfMinRadius = 0.12f;
+	const float kfMaxError = cMath::ToRad(25.0f);
+	const float kfGain = 10.0f;		// 1/s: how fast the lever catches up with the hand
+	const float kfMaxSpeed = cMath::ToRad(360.0f);
+
+	cVRSystem *pVR = cVRSystem::Get();
+	if(cLuxVRSettings::Get().mbLeverFollowHand==false || pVR->IsActive()==false || pVR->UsesHandPointer()==false) return false;
+
+	afSpeed = 0;
+	eVRHand hand = pVR->GetPointerHand();
+	cMatrixf mtxGrip;
+	if(pVR->GetHandGripPose(hand, mtxGrip)==false)
+	{
+		mbVRAngleValid = false;
+		mfVRAngleError = 0;
+		return true;
+	}
+	if(mbVRAngleValid && mlVRHand != (int)hand) mbVRAngleValid = false;
+
+	cVector3f vPin = cMath::Vector3Normalize(mpCurrentJoint->GetPinDir());
+	cVector3f vPivot = mpCurrentJoint->GetPivotPoint();
+	cVector3f vHand = cMath::MatrixMul(pVR->GetSeatedToWorld(mpPlayer->GetCamera()), mtxGrip.GetTranslation());
+	cVector3f vRel = vHand - vPivot;
+	vRel -= vPin * cMath::Vector3Dot(vRel, vPin);
+
+	if(mbVRAngleValid==false)
+	{
+		/////////////////////////
+		// Latch: the hand itself, or (too close to the hinge) the touched point moved by the hand
+		mvVRHandOffset = 0;
+		if(vRel.Length() < kfMinRadius)
+		{
+			cVector3f vGrab = cMath::MatrixMul(mpCurrentBody->GetLocalMatrix(), mvVRGrabLocal) - vPivot;
+			vGrab -= vPin * cMath::Vector3Dot(vGrab, vPin);
+			if(vGrab.Length() < kfDeadZone)
+			{
+				vGrab = cMath::MatrixMul(mpCurrentBody->GetLocalMatrix(), mpCurrentBody->GetMassCentre()) - vPivot;
+				vGrab -= vPin * cMath::Vector3Dot(vGrab, vPin);
+			}
+			if(vGrab.Length() < kfDeadZone) vGrab = vRel;
+			if(vGrab.Length() < kfDeadZone) return true;
+
+			cVector3f vStart = cMath::Vector3Normalize(vGrab) * cMath::Max(vGrab.Length(), kfMinRadius);
+			mvVRHandOffset = vStart - vRel;
+		}
+		vRel += mvVRHandOffset;
+
+		mvVRAxisU = cMath::Vector3Normalize(vRel);
+		mvVRAxisV = cMath::Vector3Cross(vPin, mvVRAxisU);
+		mfVRPrevAngle = 0;
+		mfVRAngleError = 0;
+		mlVRHand = (int)hand;
+		mbVRAngleValid = true;
+	}
+	else
+	{
+		vRel += mvVRHandOffset;
+		if(vRel.Length() > kfDeadZone)
+		{
+			// Counterclockwise around the pin, the same sense as a positive speed
+			float fAngle = atan2(cMath::Vector3Dot(vRel, mvVRAxisV), cMath::Vector3Dot(vRel, mvVRAxisU));
+			float fDelta = fAngle - mfVRPrevAngle;
+			while(fDelta > kPif) fDelta -= k2Pif;
+			while(fDelta < -kPif) fDelta += k2Pif;
+			mfVRPrevAngle = fAngle;
+			mfVRAngleError += fDelta;
+		}
+	}
+
+	float fLeverSpeed = cMath::Vector3Dot(vPin, mpCurrentBody->GetAngularVelocity());
+	mfVRAngleError -= fLeverSpeed * afTimeStep;
+	mfVRAngleError = cMath::Clamp(mfVRAngleError, -kfMaxError, kfMaxError);
+
+	afSpeed = cMath::Clamp(mfVRAngleError * kfGain, -kfMaxSpeed, kfMaxSpeed);
+	return true;
 }
 
 //-----------------------------------------------------------------------

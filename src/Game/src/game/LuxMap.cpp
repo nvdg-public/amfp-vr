@@ -247,6 +247,7 @@ void cLuxMap::OnEnter(bool abRunScript, bool abFirstTime)
 			mpScript->Run("OnEnter()");
 		}
 	}
+	RunTestTeleport();
 	
 }
 
@@ -330,6 +331,21 @@ void cLuxMap::OnRenderSolid(cRendererCallbackFunctions* apFunctions)
 		if(pEntity->IsActive()) 
 			pEntity->OnRenderSolid(apFunctions);
 	}
+}
+
+//-----------------------------------------------------------------------
+
+void cLuxMap::RunTestTeleport()
+{
+	static bool bDone = false;
+	const char *pPos = getenv("HPL_TEST_TELEPORT");
+	if(bDone || pPos==NULL || pPos[0]==0) return;
+	cLuxNode_PlayerStart *pNode = GetPlayerStart(pPos);
+	if(pNode==NULL) return;
+
+	bDone = true;
+	Log("Test teleport to '%s'\n", pPos);
+	gpBase->mpPlayer->PlaceAtStartNode(pNode);
 }
 
 //-----------------------------------------------------------------------
