@@ -21,3 +21,6 @@
 !/run/vr_assets/
 dist/
 /src/tools/vrlauncher/obj/
+
+# Player logs sent in for support (contain their PC details)
+user_logs/
