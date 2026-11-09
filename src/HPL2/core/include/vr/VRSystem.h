@@ -171,6 +171,10 @@ namespace hpl {
 
 		/** Logic step length, used to interpolate the body between logic steps. */
 		void SetLogicStepSize(float afStep){ mfLogicStep = afStep; }
+		/** Called by the engine every frame after the logic updates: the logic timer's time (ms, SDL ticks clock,
+			= the time the latest step simulated up to), its step length (ms) and the number of steps run so far.
+			Gives the body interpolation its blend factor, so it is even at any refresh rate. */
+		void SetLogicClock(double afLogicTimeMs, double afStepMs, int alStepCount);
 
 		/** Where straight ahead (the eye's forward axis) falls in the eye image, 0..1 from the bottom-left. */
 		cVector2f GetStraightAheadUV(eVREye aEye) const;
@@ -401,13 +405,18 @@ namespace hpl {
 		int mlFrameCount;
 
 		// Body interpolation: the game moves the camera at the logic rate (60 Hz), the HMD wants 90-120 Hz.
-		// Render the body between the previous and the latest logic position/yaw (one step behind, smooth).
+		// Render the body between the previous and the latest logic position/yaw, blended by the logic clock.
 		void UpdateBodyInterpolation(cCamera *apCamera, cVector3f &avPos, float &afYaw);
 		cCamera *mpInterpCamera;
 		cVector3f mvBodyPrevPos, mvBodyCurPos;
 		float mfBodyPrevYaw, mfBodyCurYaw;
 		double mfBodyChangeTime;
 		float mfLogicStep;
+		// Logic clock (SetLogicClock): blend factor between the previous and the latest logic step, step counts
+		float mfLogicAlpha;
+		int mlLogicStepCount, mlBodyCurStep, mlBodySeenStep;
+		double mfTicksOffsetMs;
+		bool mbTicksOffsetValid;
 		cVector3f mvRenderBodyPos;
 		float mfRenderBodyYaw;
 

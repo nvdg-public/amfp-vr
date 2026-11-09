@@ -146,6 +146,10 @@ namespace hpl {
 		mfVignetteMoveSpeed = mfVignetteTurnRate = mfVignetteAmount = 0;
 		mfVignetteLastTime = 0;
 		mfBodyChangeTime = 0;
+		mfLogicAlpha = 1;
+		mlLogicStepCount = mlBodyCurStep = mlBodySeenStep = 0;
+		mfTicksOffsetMs = 0;
+		mbTicksOffsetValid = false;
 		mfLogicStep = 1.0f/60.0f;
 
 		mpConfig = NULL;
@@ -218,6 +222,29 @@ namespace hpl {
 #endif
 	}
 
+	void cVRSystem::SetLogicClock(double afLogicTimeMs, double afStepMs, int alStepCount)
+	{
+		// The logic timer counts in whole SDL ticks (ms). Map our precise clock onto that clock: ticks =
+		// floor(precise + offset), so the largest (ticks - precise) seen is the offset (re-taken if it drifts).
+		double fPreciseMs = SecondsNow() * 1000.0;
+		double fDiff = (double)cPlatform::GetApplicationTime() - fPreciseMs;
+		if(mbTicksOffsetValid==false || fDiff > mfTicksOffsetMs || fDiff < mfTicksOffsetMs - 2.0)
+		{
+			mfTicksOffsetMs = fDiff;
+			mbTicksOffsetValid = true;
+		}
+		double fNowMs = fPreciseMs + mfTicksOffsetMs;
+
+		// The latest step simulated up to afLogicTimeMs (at or a bit after now), the one before up to one step
+		// earlier: now lies between them. Frame start times are what the blend follows, so it is even at any
+		// refresh rate (the old blend from the render time of the frame that first saw a step was only even
+		// at 120 Hz).
+		float fAlpha = afStepMs > 0 ? (float)(1.0 - (afLogicTimeMs - fNowMs) / afStepMs) : 1.0f;
+		mfLogicAlpha = cMath::Clamp(fAlpha, 0.0f, 1.0f);
+		mlLogicStepCount = alStepCount;
+		if(afStepMs > 0) mfLogicStep = (float)(afStepMs / 1000.0);
+	}
+
 	void cVRSystem::UpdateBodyInterpolation(cCamera *apCamera, cVector3f &avPos, float &afYaw)
 	{
 		double fNow = SecondsNow();
@@ -227,32 +254,46 @@ namespace hpl {
 			mvBodyPrevPos = mvBodyCurPos = avPos;
 			mfBodyPrevYaw = mfBodyCurYaw = afYaw;
 			mfBodyChangeTime = fNow;
+			mlBodyCurStep = mlBodySeenStep = mlLogicStepCount;
 			return;
 		}
 
-		// A new logic step moved the camera: interpolate from the previous logic step to this one. (Starting from
-		// where we rendered last froze every other frame at 120 Hz render / 60 Hz logic: walking judder.)
+		// A logic step moved the camera: blend from the step before to this one
 		if(avPos != mvBodyCurPos || afYaw != mfBodyCurYaw)
 		{
+			int lSteps = mlLogicStepCount - mlBodySeenStep;	// logic steps since the last frame
+			cVector3f vOldPos = mvBodyCurPos;
+			float fOldYaw = mfBodyCurYaw;
 			mvBodyPrevPos = mvBodyCurPos;
 			mfBodyPrevYaw = mfBodyCurYaw;
 			mvBodyCurPos = avPos;
 			mfBodyCurYaw = afYaw;
 			mfBodyChangeTime = fNow;
+			mlBodyCurStep = mlLogicStepCount;
+
+			// Several steps in one frame: the step before the latest is that fraction of the way (constant speed)
+			if(lSteps >= 2)
+			{
+				float fBack = 1.0f / (float)lSteps;
+				mvBodyPrevPos = mvBodyCurPos - (mvBodyCurPos - vOldPos) * fBack;
+				mfBodyPrevYaw = mfBodyCurYaw - cMath::GetAngleDistanceRad(fOldYaw, mfBodyCurYaw) * fBack;
+			}
 
 			// Teleports and big (snap) turns snap
 			float fYawJump = cMath::Abs(cMath::GetAngleDistanceRad(mfBodyPrevYaw, mfBodyCurYaw));
 			// Smooth turning speed for the comfort vignette (snap turns are instant: no vignette)
 			mfVignetteTurnRate = fYawJump > cMath::ToRad(15.0f) ? 0 : fYawJump / cMath::Max(mfLogicStep, 0.001f);
-			if(cMath::Vector3Dist(mvBodyPrevPos, mvBodyCurPos) > 1.0f || fYawJump > cMath::ToRad(15.0f))
+			// Moved without a logic step (recenter, map load): snap too
+			if(lSteps == 0 || cMath::Vector3Dist(mvBodyPrevPos, mvBodyCurPos) > 1.0f || fYawJump > cMath::ToRad(15.0f))
 			{
 				mvBodyPrevPos = mvBodyCurPos; mfBodyPrevYaw = mfBodyCurYaw;
 			}
 		}
+		mlBodySeenStep = mlLogicStepCount;
 
-		float fT = mfLogicStep > 0 ? (float)((fNow - mfBodyChangeTime) / mfLogicStep) : 1.0f;
-		if(fT > 1) fT = 1;
-		if(fT < 0) fT = 0;
+		// The latest step moved the body: blend by the logic clock. Otherwise the body has stopped at the latest
+		// position.
+		float fT = mlBodyCurStep == mlLogicStepCount ? mfLogicAlpha : 1.0f;
 
 		float fYawDelta = mfBodyCurYaw - mfBodyPrevYaw;
 		while(fYawDelta > kPif) fYawDelta -= k2Pif;

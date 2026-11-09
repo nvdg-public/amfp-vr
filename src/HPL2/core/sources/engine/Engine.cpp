@@ -513,6 +513,9 @@ namespace hpl {
 
 					mvMaxGameLogic.push_back(mpInnerGameLogicTimer->GetTimeInMilliSec());
 				}
+				// VR: the body interpolation blends by the logic clock (before EndUpdateLoop, which may reset it)
+				if(cVRSystem::Get()->IsActive())
+					cVRSystem::Get()->SetLogicClock(mpLogicTimer->GetLocalTime(), mpLogicTimer->GetLocalTimeAdd(), mlNumLogicLoops);
 				mpLogicTimer->EndUpdateLoop();
 
 				////////////////
