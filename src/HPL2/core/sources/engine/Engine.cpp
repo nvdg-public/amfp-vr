@@ -624,6 +624,8 @@ namespace hpl {
 						pLowGfx->ClearFrameBuffer(eClearFrameBufferFlag_Color);
 						pVR->SetGuiPass(eVRGuiPass_Panel);
 						mpScene->RenderVRGuiPanel(mfFrameTime);
+						//The VR settings menu (game) on top of the GUI
+						pVR->DrawGuiPanelOverlay();
 					}
 					pVR->SetGuiPass(eVRGuiPass_FullScreen);
 

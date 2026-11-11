@@ -95,15 +95,20 @@ public:
 
 	static const cLuxVRSettings& Get()
 	{
-		static cLuxVRSettings gSettings;
 		static bool bLoaded = false;
 		if(bLoaded==false)
 		{
-			gSettings.Load();
+			Instance().Load();
 			bLoaded = true;
 		}
-		return gSettings;
+		return Instance();
 	}
+
+	/** Re-reads everything from the (in-memory) vr_settings.cfg, e.g. after the VR settings menu changed it. */
+	static void Reload(){ Get(); Instance().Load(); }
+
+private:
+	static cLuxVRSettings& Instance(){ static cLuxVRSettings gSettings; return gSettings; }
 
 private:
 	static eTurn ToTurn(const tString& asX, eTurn aDefault)

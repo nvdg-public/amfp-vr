@@ -94,6 +94,8 @@ public:
 	virtual ~cLuxProp_Object();
 
 	bool GetVRStaticPropOrigin(){ return mbVRStaticPropOrigin; }
+	/** VR: gives a frozen decoration (Hands GrabSmallProps) its physics. */
+	void VRUnfreeze(iPhysicsBody *apBody);
 
 	//////////////////////
 	//General
@@ -101,6 +103,8 @@ public:
 	bool OnInteract(iPhysicsBody *apBody, const cVector3f &avPos);
 	
 	void OnSetupAfterLoad(cWorld *apWorld);
+	void OnMapEnter();
+	void VRCheckInDrawer();
 
 	void OnResetProperties();
 
@@ -156,6 +160,8 @@ private:
 	eLuxObjectType mObjectType;
 	float mfVRGrabMass;	// VR: a decoration made grabbable (Hands GrabSmallProps); if it has no mass it gets this one when picked up
 	bool mbVRStaticPropOrigin;	// VR: created by the static prop loader, so a map load that skips dynamic entities creates it too
+	bool mbVRDrawerChecked;	// VR: VRCheckInDrawer ran since the map was entered (it runs in the first update, after a save is applied)
+	bool mbVRWakeOnContact;	// VR: a moving body touched the frozen decoration this physics step; it gets its physics in the next update
 
 	//Vars
 	bool mbBroken;

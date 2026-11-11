@@ -188,6 +188,18 @@ namespace hpl {
 
 		/** The loaded vr_settings.cfg (never NULL once VR is active), for game-side settings. */
 		cConfigFile* GetConfig() const { return mpConfig; }
+		/** Re-reads the settings that apply while the game runs from the in-memory config (VR settings menu):
+			menu panel, pointer, sticks/trigger, vignette, mirror fit/zoom/source, edge smoothing, diagnostics log. */
+		void ApplyLiveSettings();
+
+		/** Picture drawn over the GUI panel after the game's GUI (the VR settings menu): 32-bit BGRA, bottom-up rows,
+			alNumW x alNumH pixels, placed with its top-left corner at avPos (panel pixels, y down). Uploaded to a texture
+			only when abChanged. apPixels must stay valid until the next call; NULL hides it. */
+		void SetGuiPanelOverlay(const void *apPixels, int alW, int alH, const cVector2l &avPos, bool abChanged);
+		/** A small pointer dot on the overlay (panel pixels), since the game's own cursor is drawn under it. */
+		void SetGuiPanelOverlayCursor(bool abShow, const cVector2l &avPos){ mbOverlayCursor = abShow; mvOverlayCursor = avPos; }
+		/** Draws the overlay into the bound GUI panel framebuffer (engine, after the GUI panel pass). */
+		void DrawGuiPanelOverlay();
 
 		/** Comfort vignette: the player's artificial movement speed (m/s, stick/keyboard walking, not room-scale),
 			set by the game every logic step. Smooth turning is measured here from the body yaw. */
@@ -332,6 +344,16 @@ namespace hpl {
 
 		// Settings (vr_settings.cfg next to the exe, overridable with HPL_VR_* environment variables)
 		void LoadSettings();
+		void ReadLiveSettings();
+		// GUI panel overlay (SetGuiPanelOverlay)
+		const void *mpOverlayPixels;
+		int mlOverlayW, mlOverlayH;
+		cVector2l mvOverlayPos;
+		bool mbOverlayDirty;
+		unsigned int mlOverlayTexture;
+		int mlOverlayTexW, mlOverlayTexH;
+		bool mbOverlayCursor;
+		cVector2l mvOverlayCursor;
 		void CaptureIfRequested();
 		float mfRenderScale;
 		int mlRefreshRateHint;
@@ -429,6 +451,14 @@ namespace hpl {
 		void LogDeviceInfo();
 		void LogSeatedZero(const char *asWhen);
 		void LogDiagnostics();
+		/** Re-reads the eyes' projection and eye-to-head transforms (streamers such as Virtual Desktop or Steam Link
+			can change them after the app started): on IPD/property events and every second. Changes are applied to
+			the frustums (the render size stays) and logged. */
+		void CheckEyeGeometry(bool abForce);
+		void ApplyEyeTangents(const float avRaw[2][4]);
+		float mvRawProjection[eVREye_LastEnum][4];	// last GetProjectionRaw: left, right, top, bottom (y down)
+		double mfLastEyeGeometryCheck;
+		int mlEyeGeometryChanges;
 		bool mbDiagLog;
 		double mfDiagStartTime, mfDiagLastTime;
 		int mlDiagPoses, mlDiagInvalidPoses, mlDiagTrackingResult;

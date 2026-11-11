@@ -278,6 +278,15 @@ static inline cVector3f GetCorrectNormal(const cVector3f& avNormal, const cVecto
 void cLuxProp_Object_BodyCallback::OnBodyCollide(iPhysicsBody *apBody, iPhysicsBody *apCollideBody, cPhysicsContactData* apContactData)
 {
 	//////////////////////////////////////
+	// VR: a frozen decoration wakes up when a moving body (drawer, door, falling prop...) pushes it. The player's
+	// and enemies' character bodies don't, so walking past leaves it where it is, as before.
+	if(mpObject->mfVRGrabMass > 0 && apBody->GetMass()==0 && apCollideBody->GetMass() > 0 && apCollideBody->IsCharacter()==false)
+	{
+		if(apCollideBody->GetVelocityAtPosition(apContactData->mvContactPosition).SqrLength() > 0.03f*0.03f)
+			mpObject->mbVRWakeOnContact = true;
+	}
+
+	//////////////////////////////////////
 	// Check breakage
 	if(mpObject->mBreakData.mbActive)
 	{
@@ -358,6 +367,8 @@ cLuxProp_Object::cLuxProp_Object(const tString &asName,int alID, cLuxMap *apMap)
 	mbBroken = false;
 	mfVRGrabMass = 0;
 	mbVRStaticPropOrigin = false;
+	mbVRWakeOnContact = false;
+	mbVRDrawerChecked = false;
 	mfLifeLengthCount =0;
 	mlStuckState =0;
 
@@ -412,12 +423,7 @@ bool cLuxProp_Object::OnInteract(iPhysicsBody *apBody, const cVector3f &avPos)
 	mpMap->DetachBodyFromStickyArea(apBody);
 
 	// VR: a decoration gets its physics when picked up
-	if(mfVRGrabMass > 0 && pBody->GetMass()==0)
-	{
-		SetStaticPhysics(false);
-		if(pBody->GetMass()==0) pBody->SetMass(mfVRGrabMass);
-		pBody->Enable();
-	}
+	VRUnfreeze(pBody);
 
 	////////////////////////
 	// Grab
@@ -526,8 +532,107 @@ void cLuxProp_Object::OnResetProperties()
 }
 //-----------------------------------------------------------------------
 
+void cLuxProp_Object::VRUnfreeze(iPhysicsBody *apBody)
+{
+	mbVRWakeOnContact = false;
+	if(mfVRGrabMass <= 0 || apBody==NULL || apBody->GetMass()!=0) return;
+
+	SetStaticPhysics(false);
+	if(apBody->GetMass()==0) apBody->SetMass(mfVRGrabMass);
+	apBody->Enable();
+}
+
+//-----------------------------------------------------------------------
+
+/** VR: the body a ray down from a decoration hits first (not the decoration itself, not characters). */
+class cLuxVRDrawerRayCallback : public iPhysicsRayCallback
+{
+public:
+	cLuxVRDrawerRayCallback(iLuxProp *apProp) : mpProp(apProp), mpHit(NULL), mfMinT(2.0f) {}
+
+	bool BeforeIntersect(iPhysicsBody *apBody)
+	{
+		if(apBody->IsCharacter() || apBody->GetCollide()==false) return false;
+		return (iLuxEntity*)apBody->GetUserData() != mpProp;
+	}
+	bool OnIntersect(iPhysicsBody *apBody, cPhysicsRayParams *apParams)
+	{
+		if(BeforeIntersect(apBody)==false) return true;
+		if(apParams->mfT < mfMinT){ mfMinT = apParams->mfT; mpHit = apBody; }
+		return true;
+	}
+
+	iLuxProp *mpProp;
+	iPhysicsBody *mpHit;
+	float mfMinT;
+};
+
+/** VR: a body that moves on a joint (it is the joint's child) and has mass: a drawer, a lid, a flap... */
+static bool LuxVRIsJointMovedBody(iPhysicsBody *apBody)
+{
+	if(apBody==NULL || apBody->GetMass()<=0) return false;
+	for(int i=0; i<apBody->GetJointNum(); ++i)
+		if(apBody->GetJoint(i)->GetChildBody()==apBody) return true;
+	return false;
+}
+
+//-----------------------------------------------------------------------
+
+/**
+ * VR: a frozen decoration that lies in a drawer (or on another body that moves on a joint) gets its physics when
+ * the map is entered, so it slides out with the drawer. First the body right below its centre; if that is not a
+ * moving part, a moving part whose box contains the centre (drawers whose bottom is not where the ray hits).
+ * Runs in the first update after the map is entered, so a loaded save has been applied (it sets the physics state).
+ */
+void cLuxProp_Object::OnMapEnter()
+{
+	mbVRDrawerChecked = false;
+}
+
+void cLuxProp_Object::VRCheckInDrawer()
+{
+	mbVRDrawerChecked = true;
+	if(mfVRGrabMass <= 0 || mvBodies.empty()) return;
+	iPhysicsBody *pBody = mpMainBody ? mpMainBody : mvBodies[0];
+	if(pBody->GetMass()!=0) return;
+	iPhysicsWorld *pWorld = mpMap->GetPhysicsWorld();
+	if(pWorld==NULL) return;
+
+	cBoundingVolume *pBV = pBody->GetBoundingVolume();
+	cVector3f vCentre = pBV->GetWorldCenter();
+	cVector3f vEnd(vCentre.x, pBV->GetMin().y - 0.05f, vCentre.z);
+
+	cLuxVRDrawerRayCallback rayCallback(this);
+	pWorld->CastRay(&rayCallback, vCentre, vEnd, false, false, false);
+	bool bInDrawer = LuxVRIsJointMovedBody(rayCallback.mpHit);
+
+	if(bInDrawer==false && rayCallback.mpHit && rayCallback.mpHit->GetMass()==0)
+	{
+		cPhysicsBodyIterator it = pWorld->GetBodyIterator();
+		while(it.HasNext() && bInDrawer==false)
+		{
+			iPhysicsBody *pOther = it.Next();
+			if((iLuxEntity*)pOther->GetUserData() == this || LuxVRIsJointMovedBody(pOther)==false) continue;
+			cBoundingVolume *pOtherBV = pOther->GetBoundingVolume();
+			cVector3f vMin = pOtherBV->GetMin(), vMax = pOtherBV->GetMax();
+			bInDrawer =	vCentre.x > vMin.x && vCentre.x < vMax.x && vCentre.y > vMin.y && vCentre.y < vMax.y &&
+						vCentre.z > vMin.z && vCentre.z < vMax.z;
+		}
+	}
+
+	if(bInDrawer) VRUnfreeze(pBody);
+}
+
+//-----------------------------------------------------------------------
+
 void cLuxProp_Object::UpdatePropSpecific(float afTimeStep)
 {
+	//////////////////////////
+	// VR: pushed by a moving body while frozen (set in the contact callback, so the mass changes outside the physics step)
+	if(mbVRDrawerChecked==false) VRCheckInDrawer();
+	if(mbVRWakeOnContact)
+		VRUnfreeze(mpMainBody ? mpMainBody : (mvBodies.empty() ? NULL : mvBodies[0]));
+
 	//////////////////////////
 	// Food attraction
 	UpdateFoodEnemyAttraction(afTimeStep);

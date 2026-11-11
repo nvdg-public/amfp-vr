@@ -18,6 +18,7 @@
  */
 
 #include "LuxInputHandler.h"
+#include "LuxVRSettingsMenu.h"
 #include "LuxVR.h"
 #include "input/ActionVR.h"
 
@@ -518,6 +519,10 @@ void cLuxInputHandler::Update(float afTimeStep)
 	UpdateEventSensitityModifier(afTimeStep);
 
 	///////////////////////////////////
+	// VR settings panel (left stick click in the main menu / pause menu)
+	cLuxVRSettingsMenu::Get()->Update(mState == eLuxInputState_MainMenu);
+
+	///////////////////////////////////
 	// Update input for current state
 	UpdateGlobalInput();
 
@@ -813,7 +818,7 @@ void cLuxInputHandler::UpdateGlobalInput()
 
 	/////////////////
 	// Send to GUI
-	if(CurrentStateSendsInputToGui())
+	if(CurrentStateSendsInputToGui() && cLuxVRSettingsMenu::Get()->IsBlockingInput()==false)
 	{
 		cGui *pGui = gpBase->mpEngine->GetGui();
 
@@ -1600,6 +1605,9 @@ void cLuxInputHandler::UpdatePreMenuInput()
 
 void cLuxInputHandler::UpdateMainMenuInput()
 {
+	// The VR settings panel has the input while it is open
+	if(cLuxVRSettingsMenu::Get()->IsBlockingInput()) return;
+
 	if(ShowMouseOnMouseInput())
 	{
 		gpBase->mpMainMenu->GetSet()->SetMouseMovementEnabled(true);

@@ -688,7 +688,12 @@ void cLuxPlayerHands::DestroyVRControllers(cLuxMap *apMap)
 void cLuxPlayerHands::UpdateVRHands(const cMatrixf& a_mtxSeatedToWorld)
 {
 	const cLuxVRSettings &settings = cLuxVRSettings::Get();
-	if(settings.mbShowHands==false) return;
+	if(settings.mbShowHands==false)
+	{
+		// Switched off in the VR settings menu: hide hands that were already made
+		for(int i=0; i<2; ++i) if(mvVRHandEntity[i] && mvVRHandEntity[i]->IsVisible()) mvVRHandEntity[i]->SetVisible(false);
+		return;
+	}
 	cLuxMap *pMap = gpBase->mpMapHandler->GetCurrentMap();
 	if(pMap==NULL || mpHandsEntity==NULL) return;
 

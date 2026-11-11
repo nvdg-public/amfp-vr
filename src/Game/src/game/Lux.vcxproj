@@ -241,6 +241,7 @@
     <ClCompile Include="LuxMoveState_Normal.cpp" />
     <ClCompile Include="LuxPlayer.cpp" />
     <ClCompile Include="LuxPlayerHands.cpp" />
+    <ClCompile Include="LuxVRSettingsMenu.cpp" />
     <ClCompile Include="LuxPlayerHelpers.cpp" />
     <ClCompile Include="LuxPlayerState.cpp" />
     <ClCompile Include="LuxPlayerState_DefaultBase.cpp" />
@@ -352,6 +353,7 @@
     <ClInclude Include="LuxMoveState_Normal.h" />
     <ClInclude Include="LuxPlayer.h" />
     <ClInclude Include="LuxPlayerHands.h" />
+    <ClInclude Include="LuxVRSettingsMenu.h" />
     <ClInclude Include="LuxPlayerHelpers.h" />
     <ClInclude Include="LuxPlayerState.h" />
     <ClInclude Include="LuxPlayerState_DefaultBase.h" />

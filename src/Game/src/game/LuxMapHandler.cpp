@@ -581,8 +581,9 @@ void cLuxMapHandler::LoadMainConfig()
 void cLuxMapHandler::ApplyVRPostEffectOverrides()
 {
 	if(cVRSystem::Get()->IsActive()==false) return;
-	if(cLuxVRSettings::Get().mbRadialBlur==false) mpPostEffect_RadialBlur->SetDisabled(true);
-	if(cLuxVRSettings::Get().mbImageTrail==false) mpPostEffect_ImageTrail->SetDisabled(true);
+	// (also called again by the VR settings menu, so a setting switched back on enables the effect again)
+	mpPostEffect_RadialBlur->SetDisabled(cLuxVRSettings::Get().mbRadialBlur==false);
+	mpPostEffect_ImageTrail->SetDisabled(cLuxVRSettings::Get().mbImageTrail==false);
 }
 
 void cLuxMapHandler::SaveMainConfig()

@@ -61,6 +61,28 @@ namespace hpl {
 						m.m[2][0], m.m[2][1], m.m[2][2], m.m[2][3],
 						0, 0, 0, 1);
 	}
+
+	/**
+	 * An eye's frustum sides as tangents, in the layout the rest of this file uses: left, right, top, bottom with
+	 * y down (top negative = above the view axis). Taken from SteamVR's own projection matrix (GL convention), not
+	 * from GetProjectionRaw: OpenVR's raw "top" and "bottom" are the other way round from what their names (and
+	 * this file until 2026-11-09) suggest. Headsets with the same field of view up and down (Valve Index) don't
+	 * show the difference; a Quest 3 (44 deg up, 55 deg down) got a frustum looking 11 deg too far up, which the
+	 * lenses turn into the world warping as you turn your head.
+	 */
+	static void GetEyeTangents(vr::EVREye aEye, float *apOut)
+	{
+		vr::HmdMatrix44_t p = gpHmd->GetProjectionMatrix(aEye, 0.1f, 100.0f);
+		// GL off-axis frustum: p[0][0] = 2/(r-l), p[0][2] = (r+l)/(r-l), p[1][1] = 2/(t-b), p[1][2] = (t+b)/(t-b)
+		float fL = (p.m[0][2] - 1.0f) / p.m[0][0];
+		float fR = (p.m[0][2] + 1.0f) / p.m[0][0];
+		float fB = (p.m[1][2] - 1.0f) / p.m[1][1];
+		float fT = (p.m[1][2] + 1.0f) / p.m[1][1];
+		apOut[0] = fL;
+		apOut[1] = fR;
+		apOut[2] = -fT;	// y down: above the axis is negative
+		apOut[3] = -fB;
+	}
 #endif
 
 	static bool EnvFlag(const char *asName)
@@ -110,12 +132,23 @@ namespace hpl {
 		mGuiPass = eVRGuiPass_All;
 		mlGuiPanelFramebuffer = mlGuiPanelTexture = 0;
 		mlGuiOverlay = 0;
+		mpOverlayPixels = NULL;
+		mlOverlayW = mlOverlayH = 0;
+		mvOverlayPos = cVector2l(0,0);
+		mbOverlayDirty = false;
+		mlOverlayTexture = 0;
+		mlOverlayTexW = mlOverlayTexH = 0;
+		mbOverlayCursor = false;
+		mvOverlayCursor = cVector2l(0,0);
 		for(int i=0; i<eVREye_LastEnum; ++i)
 		{
 			mvEyeTan[i][0] = mvEyeTan[i][2] = -1;
 			mvEyeTan[i][1] = mvEyeTan[i][3] = 1;
 		}
 		mfTanX = mfTanY = 1;
+		mfLastEyeGeometryCheck = 0;
+		mlEyeGeometryChanges = 0;
+		for(int i=0; i<eVREye_LastEnum; ++i) { mvRawProjection[i][0] = mvRawProjection[i][2] = -1; mvRawProjection[i][1] = mvRawProjection[i][3] = 1; }
 		for(int i=0; i<eVREye_LastEnum; ++i)
 		{
 			mvEyeFramebuffer[i] = mvEyeTexture[i] = mvEyeDepth[i] = 0;
@@ -355,7 +388,7 @@ namespace hpl {
 		for(int i=0; i<eVREye_LastEnum; ++i)
 		{
 			vr::EVREye eye = i==0 ? vr::Eye_Left : vr::Eye_Right;
-			gpHmd->GetProjectionRaw(eye, &vRaw[i][0], &vRaw[i][1], &vRaw[i][2], &vRaw[i][3]);
+			GetEyeTangents(eye, vRaw[i]);
 			m_mtxEyeToHead[i] = ToMatrix(gpHmd->GetEyeToHeadTransform(eye));
 
 			fMaxX = cMath::Max(fMaxX, cMath::Max(fabs(vRaw[i][0]), fabs(vRaw[i][1])));
@@ -363,7 +396,7 @@ namespace hpl {
 			fSpanX = cMath::Max(fSpanX, vRaw[i][1] - vRaw[i][0]);
 			fSpanY = cMath::Max(fSpanY, vRaw[i][3] - vRaw[i][2]);
 
-			Log(" Eye %d raw projection: left %.4f right %.4f top %.4f bottom %.4f\n", i, vRaw[i][0], vRaw[i][1], vRaw[i][2], vRaw[i][3]);
+			Log(" Eye %d frustum (from SteamVR's projection matrix, y down): left %.4f right %.4f top %.4f bottom %.4f\n", i, vRaw[i][0], vRaw[i][1], vRaw[i][2], vRaw[i][3]);
 			Log(" Eye %d to head: %s\n", i, m_mtxEyeToHead[i].ToString().c_str());
 		}
 		mfTanX = fMaxX;
@@ -376,21 +409,23 @@ namespace hpl {
 		LoadSettings();
 		InitInput();
 
+		// Diagnostics: OpenVR's raw values next to the frustum above (their top/bottom are the other way round)
+		if(mbDiagLog)
+		{
+			for(int i=0; i<eVREye_LastEnum; ++i)
+			{
+				float vApiRaw[4];
+				gpHmd->GetProjectionRaw(i==0 ? vr::Eye_Left : vr::Eye_Right, &vApiRaw[0], &vApiRaw[1], &vApiRaw[2], &vApiRaw[3]);
+				Log(" Eye %d GetProjectionRaw: left %.4f right %.4f top %.4f bottom %.4f\n", i, vApiRaw[0], vApiRaw[1], vApiRaw[2], vApiRaw[3]);
+			}
+		}
+
 		float fPixelsPerTanY = (float)lRecH / fSpanY * mfRenderScale;
 		if(mbAsymmetricProjection)
 		{
 			////////////////////////////
 			// Off-axis frustum per eye, exactly the HMD's: no wasted pixels, no cropping.
 			// GL convention: left/bottom negative, right/top positive (OpenVR's raw top/bottom are y-down).
-			for(int i=0; i<eVREye_LastEnum; ++i)
-			{
-				mvEyeTan[i][0] = vRaw[i][0];
-				mvEyeTan[i][1] = vRaw[i][1];
-				mvEyeTan[i][2] = -vRaw[i][3];
-				mvEyeTan[i][3] = -vRaw[i][2];
-				mvBounds[i][0] = mvBounds[i][1] = 0;
-				mvBounds[i][2] = mvBounds[i][3] = 1;
-			}
 			mvRenderSize.y = (int)(fPixelsPerTanY * fSpanY + 0.5f);
 			mvRenderSize.x = (int)(fPixelsPerTanY * fSpanX + 0.5f);
 		}
@@ -398,19 +433,13 @@ namespace hpl {
 		{
 			////////////////////////////
 			// Fallback: symmetric frustum enclosing both eyes, cropped with texture bounds
-			for(int i=0; i<eVREye_LastEnum; ++i)
-			{
-				mvEyeTan[i][0] = -fMaxX; mvEyeTan[i][1] = fMaxX;
-				mvEyeTan[i][2] = -fMaxY; mvEyeTan[i][3] = fMaxY;
-				mvBounds[i][0] = (vRaw[i][0] + fMaxX) / (2*fMaxX); // uMin
-				mvBounds[i][2] = (vRaw[i][1] + fMaxX) / (2*fMaxX); // uMax
-				mvBounds[i][1] = (vRaw[i][2] + fMaxY) / (2*fMaxY); // vMin (top)
-				mvBounds[i][3] = (vRaw[i][3] + fMaxY) / (2*fMaxY); // vMax (bottom)
-			}
 			// Keep the recommended pixel density inside the cropped area, and square pixels.
 			mvRenderSize.y = (int)(fPixelsPerTanY * 2*fMaxY + 0.5f);
 			mvRenderSize.x = (int)(fPixelsPerTanY * 2*fMaxX + 0.5f);
 		}
+
+		ApplyEyeTangents(vRaw);
+		mfLastEyeGeometryCheck = SecondsNow();
 
 		Log(" Recommended per-eye size %dx%d, render size %dx%d (scale %.2f), %s projection\n",
 			lRecW, lRecH, mvRenderSize.x, mvRenderSize.y, mfRenderScale, mbAsymmetricProjection ? "asymmetric (exact)" : "symmetric (enclosing, cropped)");
@@ -428,6 +457,106 @@ namespace hpl {
 
 		mbActive = true;
 		return true;
+#endif
+	}
+
+	//-----------------------------------------------------------------------
+
+	/**
+	 * Frustum sides and texture bounds from the raw projection of both eyes (left, right, top, bottom; y down).
+	 * Asymmetric: each eye's own off-axis frustum, whole texture. Symmetric: one frustum enclosing both eyes,
+	 * cropped with texture bounds. The render size is not touched.
+	 */
+	void cVRSystem::ApplyEyeTangents(const float avRaw[2][4])
+	{
+		float fMaxX = 0, fMaxY = 0;
+		for(int i=0; i<eVREye_LastEnum; ++i)
+		{
+			for(int j=0; j<4; ++j) mvRawProjection[i][j] = avRaw[i][j];
+			fMaxX = cMath::Max(fMaxX, cMath::Max(fabs(avRaw[i][0]), fabs(avRaw[i][1])));
+			fMaxY = cMath::Max(fMaxY, cMath::Max(fabs(avRaw[i][2]), fabs(avRaw[i][3])));
+		}
+		mfTanX = fMaxX;
+		mfTanY = fMaxY;
+		mvMirrorFov[0] = avRaw[0][0];
+		mvMirrorFov[1] = avRaw[0][1];
+		mvMirrorFov[2] = -avRaw[0][3];
+		mvMirrorFov[3] = -avRaw[0][2];
+
+		for(int i=0; i<eVREye_LastEnum; ++i)
+		{
+			if(mbAsymmetricProjection)
+			{
+				// GL convention: left/bottom negative, right/top positive (OpenVR's raw top/bottom are y-down)
+				mvEyeTan[i][0] = avRaw[i][0];
+				mvEyeTan[i][1] = avRaw[i][1];
+				mvEyeTan[i][2] = -avRaw[i][3];
+				mvEyeTan[i][3] = -avRaw[i][2];
+				mvBounds[i][0] = mvBounds[i][1] = 0;
+				mvBounds[i][2] = mvBounds[i][3] = 1;
+			}
+			else
+			{
+				mvEyeTan[i][0] = -fMaxX; mvEyeTan[i][1] = fMaxX;
+				mvEyeTan[i][2] = -fMaxY; mvEyeTan[i][3] = fMaxY;
+				mvBounds[i][0] = (avRaw[i][0] + fMaxX) / (2*fMaxX); // uMin
+				mvBounds[i][2] = (avRaw[i][1] + fMaxX) / (2*fMaxX); // uMax
+				mvBounds[i][1] = (avRaw[i][2] + fMaxY) / (2*fMaxY); // vMin (top)
+				mvBounds[i][3] = (avRaw[i][3] + fMaxY) / (2*fMaxY); // vMax (bottom)
+			}
+		}
+	}
+
+	/**
+	 * Streamers (Virtual Desktop, Steam Link, Meta Link) can change the eyes' projection or eye-to-head transforms
+	 * after the app has started. Rendering with the old ones mis-scales the image against what the headset expects,
+	 * which looks like the world swimming when you turn your head. Re-read on IPD/HMD property events and every
+	 * second; apply and log changes.
+	 */
+	void cVRSystem::CheckEyeGeometry(bool abForce)
+	{
+#ifdef HPL_VR
+		double fNow = SecondsNow();
+		if(abForce==false && fNow - mfLastEyeGeometryCheck < 1.0) return;
+		mfLastEyeGeometryCheck = fNow;
+
+		float vRaw[2][4];
+		cMatrixf vEyeToHead[2];
+		bool bProjChanged = false, bEyeChanged = false;
+		for(int i=0; i<eVREye_LastEnum; ++i)
+		{
+			vr::EVREye eye = i==0 ? vr::Eye_Left : vr::Eye_Right;
+			GetEyeTangents(eye, vRaw[i]);
+			vEyeToHead[i] = ToMatrix(gpHmd->GetEyeToHeadTransform(eye));
+			for(int j=0; j<4; ++j)
+				if(fabs(vRaw[i][j] - mvRawProjection[i][j]) > 0.0005f) bProjChanged = true;
+			for(int r=0; r<3; ++r) for(int c=0; c<4; ++c)
+				if(fabs(vEyeToHead[i].m[r][c] - m_mtxEyeToHead[i].m[r][c]) > 0.0001f) bEyeChanged = true;
+		}
+		if(bProjChanged==false && bEyeChanged==false) return;
+
+		// Diagnostics Log: the first changes in full (a streamer that keeps changing them would flood the log)
+		++mlEyeGeometryChanges;
+		if(mbDiagLog && mlEyeGeometryChanges <= 10)
+		{
+			for(int i=0; i<eVREye_LastEnum; ++i)
+			{
+				if(bProjChanged)
+					Log("VR: eye %d projection changed while running: left %.4f right %.4f top %.4f bottom %.4f (was %.4f %.4f %.4f %.4f)\n", i,
+						vRaw[i][0], vRaw[i][1], vRaw[i][2], vRaw[i][3],
+						mvRawProjection[i][0], mvRawProjection[i][1], mvRawProjection[i][2], mvRawProjection[i][3]);
+				if(bEyeChanged)
+				{
+					cVector3f vPos = vEyeToHead[i].GetTranslation(), vOld = m_mtxEyeToHead[i].GetTranslation();
+					Log("VR: eye %d to head changed while running: %.1f %.1f %.1f mm (was %.1f %.1f %.1f mm)\n", i,
+						vPos.x*1000, vPos.y*1000, vPos.z*1000, vOld.x*1000, vOld.y*1000, vOld.z*1000);
+				}
+			}
+			if(mlEyeGeometryChanges == 10) Log("VR: eye geometry keeps changing, further changes are applied without logging\n");
+		}
+
+		for(int i=0; i<eVREye_LastEnum; ++i) m_mtxEyeToHead[i] = vEyeToHead[i];
+		if(bProjChanged) ApplyEyeTangents(vRaw);
 #endif
 	}
 
@@ -580,38 +709,16 @@ namespace hpl {
 
 		mfRenderScale = cfg.GetFloat("Render", "Scale", 1.0f);
 		mbAsymmetricProjection = cString::ToLowerCase(cfg.GetString("Render", "Projection", "Asymmetric")) != "symmetric";
-		mbEdgeSmooth = cfg.GetBool("Render", "EdgeSmooth", false);
 		mlRefreshRateHint = cfg.GetInt("Display", "RefreshRateHint", 0);
-		mfMenuDistance = cfg.GetFloat("Menu", "Distance", 2.0f);
-		mfMenuWidth = cfg.GetFloat("Menu", "Width", 2.0f);
-		mfMenuHeight = cfg.GetFloat("Menu", "Height", 0.0f);
-		mbMenuFollowLazy = cString::ToLowerCase(cfg.GetString("Menu", "Follow", "Lazy")) != "fixed";
-		mfMenuFollowAngle = cMath::ToRad(cMath::Clamp(cfg.GetFloat("Menu", "FollowAngle", 40.0f), 10.0f, 180.0f));
-		mbGazePointer = cfg.GetBool("Menu", "GazePointer", true);
-		mbKeyboard = cfg.GetBool("Menu", "Keyboard", true);
-		mlRecenterKey = KeyNameToVirtualKey(cfg.GetString("Input", "RecenterKey", "F9"));
-		mbMirrorEnabled = cfg.GetBool("Mirror", "Enabled", true);
-		mfHeadMaxUp = cfg.GetFloat("Body", "MaxHeadRise", 0.15f);
 		mvMirrorSize.x = cfg.GetInt("Mirror", "Width", 1280);
 		mvMirrorSize.y = cfg.GetInt("Mirror", "Height", 720);
-		mbMirrorFill = cString::ToLowerCase(cfg.GetString("Mirror", "Fit", "Fill")) != "fit";
-		mfMirrorZoom = cMath::Clamp(cfg.GetFloat("Mirror", "Zoom", 1.0f), 1.0f, 4.0f);
 		tString sMirrorWindow = cString::ToLowerCase(cfg.GetString("Mirror", "Window", "Normal"));
 		mMirrorWindow = sMirrorWindow == "borderless" ? eVRMirrorWindow_Borderless :
 						sMirrorWindow == "fullscreen" ? eVRMirrorWindow_Fullscreen : eVRMirrorWindow_Normal;
-		mbMirrorCompositor = cString::ToLowerCase(cfg.GetString("Mirror", "Source", "Game")) == "compositor";
 		mbLeftHanded = cfg.GetBool("Input", "LeftHanded", false);
 		mPointerHand = cString::ToLowerCase(cfg.GetString("Input", "Hand", mbLeftHanded ? "Left" : "Right")) == "left" ? eVRHand_Left : eVRHand_Right;
 		mActiveHand = mPointerHand;
-		mbHandPointer = cString::ToLowerCase(cfg.GetString("Input", "Pointer", "Hand")) != "head";
-		mfStickDeadZone = cMath::Clamp(cfg.GetFloat("Input", "StickDeadZone", 0.15f), 0.0f, 0.8f);
-		mfTriggerThreshold = cMath::Clamp(cfg.GetFloat("Input", "TriggerThreshold", 0.5f), 0.05f, 1.0f);
-		mbVignette = cfg.GetBool("Vignette", "Enabled", false);
-		mbVignetteOnTurn = cfg.GetBool("Vignette", "OnTurn", true);
-		mfVignetteStrength = cMath::Clamp(cfg.GetFloat("Vignette", "Strength", 0.5f), 0.0f, 1.0f);
-		mfVignetteFadeIn = cMath::Clamp(cfg.GetFloat("Vignette", "FadeIn", 0.15f), 0.0f, 3.0f);
-		mfVignetteFadeOut = cMath::Clamp(cfg.GetFloat("Vignette", "FadeOut", 0.4f), 0.0f, 3.0f);
-		mbDiagLog = cfg.GetBool("Diagnostics", "Log", false);
+		ReadLiveSettings();
 
 		////////////////////////////////
 		// Environment overrides (for tests and quick experiments)
@@ -628,8 +735,6 @@ namespace hpl {
 		////////////////////////////////
 		// Sanity
 		mfRenderScale = cMath::Clamp(mfRenderScale, 0.3f, 2.0f);
-		mfMenuDistance = cMath::Clamp(mfMenuDistance, 0.5f, 10.0f);
-		mfMenuWidth = cMath::Clamp(mfMenuWidth, 0.2f, 10.0f);
 		if(mvMirrorSize.x < 160 || mvMirrorSize.y < 120) mvMirrorSize = cVector2l(1280,720);
 
 		Log(" VR settings: render scale %.2f, refresh hint %d, menu %.2f m away %.2f m wide (height %.2f), recenter key 0x%x, mirror %s %dx%d\n",
@@ -639,6 +744,52 @@ namespace hpl {
 			mMirrorWindow==eVRMirrorWindow_Borderless ? "borderless" : mMirrorWindow==eVRMirrorWindow_Fullscreen ? "fullscreen" : "normal",
 			mbMirrorCompositor ? "compositor" : "game");
 		Log(" VR settings: projection %s, edge smooth %s\n", mbAsymmetricProjection ? "asymmetric" : "symmetric", mbEdgeSmooth ? "on" : "off");
+	}
+
+	//-----------------------------------------------------------------------
+
+	/** The settings that can change while the game runs (VR settings menu): read from the in-memory config. */
+	void cVRSystem::ReadLiveSettings()
+	{
+		cConfigFile &cfg = *mpConfig;
+		mbEdgeSmooth = cfg.GetBool("Render", "EdgeSmooth", false);
+		mfMenuDistance = cMath::Clamp(cfg.GetFloat("Menu", "Distance", 2.0f), 0.5f, 10.0f);
+		mfMenuWidth = cMath::Clamp(cfg.GetFloat("Menu", "Width", 2.0f), 0.2f, 10.0f);
+		mfMenuHeight = cfg.GetFloat("Menu", "Height", 0.0f);
+		mbMenuFollowLazy = cString::ToLowerCase(cfg.GetString("Menu", "Follow", "Lazy")) != "fixed";
+		mfMenuFollowAngle = cMath::ToRad(cMath::Clamp(cfg.GetFloat("Menu", "FollowAngle", 40.0f), 10.0f, 180.0f));
+		mbGazePointer = cfg.GetBool("Menu", "GazePointer", true);
+		mbKeyboard = cfg.GetBool("Menu", "Keyboard", true);
+		mlRecenterKey = KeyNameToVirtualKey(cfg.GetString("Input", "RecenterKey", "F9"));
+		mbMirrorEnabled = cfg.GetBool("Mirror", "Enabled", true);
+		mfHeadMaxUp = cfg.GetFloat("Body", "MaxHeadRise", 0.15f);
+		mbMirrorFill = cString::ToLowerCase(cfg.GetString("Mirror", "Fit", "Fill")) != "fit";
+		mfMirrorZoom = cMath::Clamp(cfg.GetFloat("Mirror", "Zoom", 1.0f), 1.0f, 4.0f);
+		mbMirrorCompositor = cString::ToLowerCase(cfg.GetString("Mirror", "Source", "Game")) == "compositor";
+		mbHandPointer = cString::ToLowerCase(cfg.GetString("Input", "Pointer", "Hand")) != "head";
+		mfStickDeadZone = cMath::Clamp(cfg.GetFloat("Input", "StickDeadZone", 0.15f), 0.0f, 0.8f);
+		mfTriggerThreshold = cMath::Clamp(cfg.GetFloat("Input", "TriggerThreshold", 0.5f), 0.05f, 1.0f);
+		mbVignette = cfg.GetBool("Vignette", "Enabled", false);
+		mbVignetteOnTurn = cfg.GetBool("Vignette", "OnTurn", true);
+		mfVignetteStrength = cMath::Clamp(cfg.GetFloat("Vignette", "Strength", 0.5f), 0.0f, 1.0f);
+		mfVignetteFadeIn = cMath::Clamp(cfg.GetFloat("Vignette", "FadeIn", 0.15f), 0.0f, 3.0f);
+		mfVignetteFadeOut = cMath::Clamp(cfg.GetFloat("Vignette", "FadeOut", 0.4f), 0.0f, 3.0f);
+		mbDiagLog = cfg.GetBool("Diagnostics", "Log", false);
+	}
+
+	void cVRSystem::ApplyLiveSettings()
+	{
+		if(mpConfig==NULL) return;
+		float fOldWidth = mfMenuWidth, fOldDist = mfMenuDistance, fOldHeight = mfMenuHeight;
+		bool bOldDiag = mbDiagLog;
+		ReadLiveSettings();
+		if(bOldDiag==false && mbDiagLog) mfDiagStartTime = mfDiagLastTime = 0;	// restart the log timeline
+#ifdef HPL_VR
+		if(mlGuiOverlay && fOldWidth != mfMenuWidth) vr::VROverlay()->SetOverlayWidthInMeters(mlGuiOverlay, mfMenuWidth);
+#endif
+		if(mbHasPose && (fOldWidth != mfMenuWidth || fOldDist != mfMenuDistance || fOldHeight != mfMenuHeight)) PlaceGuiPanelInFront();
+		Log(" VR settings: live settings applied (menu %.2f m away %.2f m wide, vignette %s %.2f, pointer %s)\n",
+			mfMenuDistance, mfMenuWidth, mbVignette ? "on" : "off", mfVignetteStrength, mbHandPointer ? "hand" : "head");
 	}
 
 	//-----------------------------------------------------------------------
@@ -850,6 +1001,139 @@ namespace hpl {
 
 	//-----------------------------------------------------------------------
 
+	void cVRSystem::SetGuiPanelOverlay(const void *apPixels, int alW, int alH, const cVector2l &avPos, bool abChanged)
+	{
+		mpOverlayPixels = apPixels;
+		mlOverlayW = alW; mlOverlayH = alH;
+		mvOverlayPos = avPos;
+		if(abChanged) mbOverlayDirty = true;
+		if(apPixels==NULL) mbOverlayCursor = false;
+	}
+
+	/**
+	 * The overlay picture (VR settings menu) on top of the GUI panel, with plain GL like the vignette. The texture is
+	 * uploaded only when the picture changed, with the unpack state reset around it (the game's values restored after).
+	 */
+	void cVRSystem::DrawGuiPanelOverlay()
+	{
+		if(mbActive==false || mlGuiPanelFramebuffer==0 || mpOverlayPixels==NULL || mlOverlayW<=0 || mlOverlayH<=0) return;
+
+		GLint lPrevProgram=0, lPrevTex=0, lPrevActive=0, lPrevFbo=0;
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &lPrevFbo);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, mlGuiPanelFramebuffer);
+		glGetIntegerv(GL_CURRENT_PROGRAM, &lPrevProgram);
+		glGetIntegerv(GL_ACTIVE_TEXTURE, &lPrevActive);
+		glActiveTexture(GL_TEXTURE0);
+		glGetIntegerv(GL_TEXTURE_BINDING_2D, &lPrevTex);
+
+		////////////////////////////////
+		// Upload when changed
+		if(mlOverlayTexture==0) glGenTextures(1, &mlOverlayTexture);
+		glBindTexture(GL_TEXTURE_2D, mlOverlayTexture);
+		if(mbOverlayDirty)
+		{
+			GLint lUnpackBuf=0, lRowLen=0, lSkipRows=0, lSkipPix=0, lAlign=4;
+			glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &lUnpackBuf);
+			glGetIntegerv(GL_UNPACK_ROW_LENGTH, &lRowLen);
+			glGetIntegerv(GL_UNPACK_SKIP_ROWS, &lSkipRows);
+			glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &lSkipPix);
+			glGetIntegerv(GL_UNPACK_ALIGNMENT, &lAlign);
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+			glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+			glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			if(mlOverlayTexW != mlOverlayW || mlOverlayTexH != mlOverlayH)
+			{
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, mlOverlayW, mlOverlayH, 0, GL_BGRA, GL_UNSIGNED_BYTE, mpOverlayPixels);
+				mlOverlayTexW = mlOverlayW; mlOverlayTexH = mlOverlayH;
+			}
+			else
+			{
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mlOverlayW, mlOverlayH, GL_BGRA, GL_UNSIGNED_BYTE, mpOverlayPixels);
+			}
+
+			glBindBuffer(GL_PIXEL_UNPACK_BUFFER, lUnpackBuf);
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, lRowLen);
+			glPixelStorei(GL_UNPACK_SKIP_ROWS, lSkipRows);
+			glPixelStorei(GL_UNPACK_SKIP_PIXELS, lSkipPix);
+			glPixelStorei(GL_UNPACK_ALIGNMENT, lAlign);
+			mbOverlayDirty = false;
+		}
+
+		////////////////////////////////
+		// Draw: panel pixels, y down (the DIB is bottom-up, so v=0 is its bottom row)
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+		glUseProgram(0);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_SCISSOR_TEST);
+		glDisable(GL_ALPHA_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_LIGHTING);
+		glDisable(GL_BLEND);
+		glDisable(GL_VERTEX_PROGRAM_ARB);
+		glDisable(GL_FRAGMENT_PROGRAM_ARB);
+		glDisable(GL_TEXTURE_RECTANGLE_ARB);
+		glDepthMask(GL_FALSE);
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glViewport(0, 0, mvRenderSize.x, mvRenderSize.y);
+		glMatrixMode(GL_TEXTURE);    glPushMatrix(); glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+		glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+		glOrtho(0, mvRenderSize.x, mvRenderSize.y, 0, -1, 1);
+
+		glEnable(GL_TEXTURE_2D);
+		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+		float x0 = (float)mvOverlayPos.x, y0 = (float)mvOverlayPos.y;
+		float x1 = x0 + mlOverlayW, y1 = y0 + mlOverlayH;
+		glBegin(GL_QUADS);
+		glTexCoord2f(0,1); glVertex2f(x0,y0);
+		glTexCoord2f(1,1); glVertex2f(x1,y0);
+		glTexCoord2f(1,0); glVertex2f(x1,y1);
+		glTexCoord2f(0,0); glVertex2f(x0,y1);
+		glEnd();
+		glDisable(GL_TEXTURE_2D);
+
+		// Pointer dot: white with a dark ring
+		if(mbOverlayCursor)
+		{
+			float fR = cMath::Max(4.0f, mvRenderSize.x * 0.006f);
+			float cx = (float)mvOverlayCursor.x, cy = (float)mvOverlayCursor.y;
+			for(int pass=0; pass<2; ++pass)
+			{
+				float r = pass==0 ? fR*1.5f : fR;
+				if(pass==0) glColor4f(0.05f,0.05f,0.05f,1); else glColor4f(1,1,1,1);
+				glBegin(GL_TRIANGLE_FAN);
+				glVertex2f(cx, cy);
+				for(int i=0; i<=24; ++i)
+				{
+					float a = (float)i / 24.0f * k2Pif;
+					glVertex2f(cx + cos(a)*r, cy + sin(a)*r);
+				}
+				glEnd();
+			}
+			glColor4f(1,1,1,1);
+		}
+
+		glMatrixMode(GL_PROJECTION); glPopMatrix();
+		glMatrixMode(GL_TEXTURE);    glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+		glPopAttrib();
+
+		glBindTexture(GL_TEXTURE_2D, lPrevTex);
+		glActiveTexture(lPrevActive);
+		glUseProgram(lPrevProgram);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, lPrevFbo);
+	}
+
+	//-----------------------------------------------------------------------
+
 	void cVRSystem::SubmitGuiPanel()
 	{
 #ifdef HPL_VR
@@ -878,6 +1162,8 @@ namespace hpl {
 		mlGuiOverlay = 0;
 		if(mlGuiPanelFramebuffer) glDeleteFramebuffersEXT(1, &mlGuiPanelFramebuffer);
 		if(mlGuiPanelTexture) glDeleteTextures(1, &mlGuiPanelTexture);
+		if(mlOverlayTexture) glDeleteTextures(1, &mlOverlayTexture);
+		mlOverlayTexture = 0;
 		mlGuiPanelFramebuffer = mlGuiPanelTexture = 0;
 		if(mlMirrorFramebuffer) glDeleteFramebuffersEXT(1, &mlMirrorFramebuffer);
 		if(mlMirrorTexture) vr::VRCompositor()->ReleaseSharedGLTexture(mlMirrorTexture, mpMirrorShared);
@@ -947,9 +1233,13 @@ namespace hpl {
 #ifdef HPL_VR
 		// Handle quit requests and the like from SteamVR
 		vr::VREvent_t event;
+		bool bEyeGeometryEvent = false;
 		while(gpHmd->PollNextEvent(&event, sizeof(event)))
 		{
 			if(event.eventType == vr::VREvent_SeatedZeroPoseReset) Log("VR: seated zero pose reset\n");
+			if(event.eventType == vr::VREvent_IpdChanged ||
+			   (event.eventType == vr::VREvent_PropertyChanged && event.trackedDeviceIndex == vr::k_unTrackedDeviceIndex_Hmd))
+				bEyeGeometryEvent = true;
 
 			// SteamVR keyboard: keep its text for the text box that opened it
 			// The current SteamVR keyboard leaves cNewInput empty and GetKeyboardText returns only the newest key
@@ -974,6 +1264,8 @@ namespace hpl {
 			if(event.eventType == vr::VREvent_KeyboardClosed || event.eventType == vr::VREvent_KeyboardClosed_Global)
 				mbKeyboardOpen = false;
 		}
+
+		CheckEyeGeometry(bEyeGeometryEvent);
 
 		double fBeforeWait = SecondsNow();
 		vr::VRCompositor()->WaitGetPoses(gvPoses, vr::k_unMaxTrackedDeviceCount, NULL, 0);
@@ -1350,7 +1642,7 @@ namespace hpl {
 		for(int i=0; i<eVREye_LastEnum; ++i)
 		{
 			float vRaw[4];
-			gpHmd->GetProjectionRaw(i==0 ? vr::Eye_Left : vr::Eye_Right, &vRaw[0], &vRaw[1], &vRaw[2], &vRaw[3]);
+			GetEyeTangents(i==0 ? vr::Eye_Left : vr::Eye_Right, vRaw);
 			const cMatrixf &m = m_mtxEyeToHead[i];
 			cVector3f vPos = m.GetTranslation() * 1000.0f;
 			float fTurn = cMath::ToDeg(acos(cMath::Clamp(m.m[2][2], -1.0f, 1.0f)));
