@@ -14,6 +14,8 @@ It is not a VorpX-style wrapper. It is a **source port**: Frictional Games relea
 - **Menus, notes and the inventory** on a panel in the world, used with a laser pointer. The SteamVR keyboard is used for text fields.
 - Every VR option is in `vr_settings.cfg`, a commented text file.
 
+**The whole game is playable in VR from start to finish.**
+
 Saves and settings are shared with the normal game (`Documents\Amnesia\Pig`). The normal game keeps working as before.
 
 ---
